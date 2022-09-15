@@ -185,7 +185,7 @@ function outputPairStats(pairStats, totalStats) {
     const parOpen = '('
     const percentClose = '%)'
 
-    // update percentages with current values
+    // update percentages & averages with current values
     for (let pairID = 0; pairID < numPairs; pairID++) {
         pairStats[pairID].priceDiffMetPct = pairStats[pairID].priceDiffMet / totalStats.numEvents * 100
         if (totalStats.errorCnt > 0) {
@@ -193,32 +193,51 @@ function outputPairStats(pairStats, totalStats) {
         } else {
             pairStats[pairID].errorCntPct = 0
         }
-        pairStats[pairID].profitCheckCntPct = pairStats[pairID].profitCheckCnt / totalStats.profitCheckCnt * 100
-        pairStats[pairID].tradeCntPct = pairStats[pairID].tradeCnt / totalStats.tradeCnt * 100
-        pairStats[pairID].tradeSuccPct = pairStats[pairID].tradeSucc / pairStats[pairID].tradeCnt * 100
-        pairStats[pairID].avgCheckProfit = pairStats[pairID].totalCheckProfit / pairStats[pairID].profitCheckCnt
+        if (totalStats.profitCheckCnt > 0) {
+            pairStats[pairID].profitCheckCntPct = pairStats[pairID].profitCheckCnt / totalStats.profitCheckCnt * 100
+        } else {
+            pairStats[pairID].profitCheckCntPct = 0
+        }
+        if (totalStats.tradeCnt > 0) {
+            pairStats[pairID].tradeCntPct = pairStats[pairID].tradeCnt / totalStats.tradeCnt * 100
+        } else {
+            pairStats[pairID].tradeCntPct = 0
+        }
+        if (pairStats[pairID].tradeCnt > 0) {
+            pairStats[pairID].tradeSuccPct = pairStats[pairID].tradeSucc / pairStats[pairID].tradeCnt * 100
+        } else {
+            pairStats[pairID].tradeSuccPct = 0 
+        }
+        if (pairStats[pairID].profitCheckCnt > 0) {
+            pairStats[pairID].avgCheckProfit = pairStats[pairID].totalCheckProfit / pairStats[pairID].profitCheckCnt
+        } else {
+            pairStats[pairID].avgCheckProfit = 0
+        }
         pairStats[pairID].avgTradeProfit = pairStats[pairID].tradeProfits / pairStats[pairID].tradeSucc
         pairStats[pairID].avgPriceDiff = pairStats[pairID].totalPriceDiffAmt / pairStats[pairID].numEvents
+
+//        console.log(`totalCheckProfit for pairID ${pairID}   = ${pairStats[pairID].totalCheckProfit}`)
+//        console.log(`profitCheckCnt for pairID ${pairID}     = ${pairStats[pairID].profitCheckCnt}`)
+//        console.log(`avgCheckProfit for pairID ${pairID}     = ${pairStats[pairID].avgCheckProfit}`)
+//        console.log(`highestCheckProfit for PairID ${pairID} = ${pairStats[pairID].highestCheckProfit}`)
     }
 
     console.log(`------------------------------------------------------------------------------------------------------------------`)
-    console.log(`                                            CURRENT PAIR STATISTICS                Min Price Difference:  ${diffSetting}% `)
-    console.log(`                                                                                                                   `)
-    console.log(`                    Num     Price                    Num         Avg        Num       Num                   Avg    `)
-    console.log(`          Num      Price    Diff         Num        Profit       Est.      Attmpt    Actual     Trade      Trade   `)
-    console.log(`Token    Events    Diffs   Avg/High     Errors      Checks      Profit     Trades    Trades     Profit     Profit  `)
-    console.log(`-----    ------    ------  --------     ------      ------      ------     ------    ------     ------     ------  `)
+    console.log(`                                      CURRENT PAIR STATISTICS          Min Price Difference:  ${diffSetting}% `)
+    console.log(`                                                                                                      `)
+    console.log(`                   Num     Price        Num         Est.       Num       Num                   Avg    `)
+    console.log(`          Num     Price    Diff        Profit      Profit     Attmpt    Actual     Trade      Trade   `)
+    console.log(`Token    Events   Diffs   Avg/High     Checks     Avg/High    Trades    Trades     Profit     Profit  `)
+    console.log(`-----    ------   ------  --------     ------     --------    ------    ------     ------     ------  `)
     // log for pair1
     console.log(`${(pairStats[0].symbol).padEnd(9)}` +
-                `${(pairStats[0].numEvents).toString().padEnd(10)}` +
+                `${(pairStats[0].numEvents).toString().padEnd(9)}` +
                 `${(pairStats[0].priceDiffMet).toString()}` + parOpen +
                 `${(pairStats[0].priceDiffMetPct).toFixed(0).toString()}` + percentClose.padEnd(4) +
                 `${(pairStats[0].avgPriceDiff).toFixed(2).toString()}/${(pairStats[0].highestPriceDiff).toString().padEnd(7)} ` +
-                `${(pairStats[0].errorCnt).toString()}` + parOpen +
-                `${(pairStats[0].errorCntPct).toFixed(0).toString()}` + percentClose.padEnd(9) +
                 `${(pairStats[0].profitCheckCnt).toString()}` + parOpen +
-                `${(pairStats[0].profitCheckCntPct).toFixed(0).toString()}` + percentClose.padEnd(9) +
-                `${(pairStats[0].avgCheckProfit).toFixed(2).toString().padEnd(11)}` +
+                `${(pairStats[0].profitCheckCntPct).toFixed(0).toString()}` + percentClose.padEnd(7) +
+                `${(pairStats[0].avgCheckProfit).toFixed(3)}/${(pairStats[0].highestCheckProfit).toString().padEnd(8)}` +
                 `${(pairStats[0].tradeCnt).toString()}` + parOpen +
                 `${(pairStats[0].tradeCntPct).toFixed(0).toString()}` + percentClose.padEnd(7) +
                 `${(pairStats[0].tradeSucc).toString()}` + parOpen +
@@ -227,15 +246,13 @@ function outputPairStats(pairStats, totalStats) {
                 `${(pairStats[0].avgTradeProfit).toFixed(2).toString()}`)
     // log for pair2
     console.log(`${(pairStats[1].symbol).padEnd(9)}` +
-                `${(pairStats[1].numEvents).toString().padEnd(10)}` +
+                `${(pairStats[1].numEvents).toString().padEnd(9)}` +
                 `${(pairStats[1].priceDiffMet).toString()}` + parOpen +
                 `${(pairStats[1].priceDiffMetPct).toFixed(0).toString()}` + percentClose.padEnd(4) +
                 `${(pairStats[1].avgPriceDiff).toFixed(2).toString()}/${(pairStats[1].highestPriceDiff).toString().padEnd(7)} ` +
-                `${(pairStats[1].errorCnt).toString()}` + parOpen +
-                `${(pairStats[1].errorCntPct).toFixed(0).toString()}` + percentClose.padEnd(9) +
                 `${(pairStats[1].profitCheckCnt).toString()}` + parOpen +
-                `${(pairStats[1].profitCheckCntPct).toFixed(0).toString()}` + percentClose.padEnd(9) +
-                `${(pairStats[1].avgCheckProfit).toFixed(2).toString().padEnd(11)}` +
+                `${(pairStats[1].profitCheckCntPct).toFixed(0).toString()}` + percentClose.padEnd(7) +
+                `${(pairStats[1].avgCheckProfit).toFixed(3)}/${(pairStats[1].highestCheckProfit).toString().padEnd(8)}` +
                 `${(pairStats[1].tradeCnt).toString()}` + parOpen +
                 `${(pairStats[1].tradeCntPct).toFixed(0).toString()}` + percentClose.padEnd(7) +
                 `${(pairStats[1].tradeSucc).toString()}` + parOpen +
@@ -244,15 +261,13 @@ function outputPairStats(pairStats, totalStats) {
                 `${(pairStats[1].avgTradeProfit).toFixed(2).toString()}`)
     // log for pair3
     console.log(`${(pairStats[2].symbol).padEnd(9)}` +
-                `${(pairStats[2].numEvents).toString().padEnd(10)}` +
+                `${(pairStats[2].numEvents).toString().padEnd(9)}` +
                 `${(pairStats[2].priceDiffMet).toString()}` + parOpen +
                 `${(pairStats[2].priceDiffMetPct).toFixed(0).toString()}` + percentClose.padEnd(4) +
                 `${(pairStats[2].avgPriceDiff).toFixed(2).toString()}/${(pairStats[2].highestPriceDiff).toString().padEnd(7)} ` +
-                `${(pairStats[2].errorCnt).toString()}` + parOpen +
-                `${(pairStats[2].errorCntPct).toFixed(0).toString()}` + percentClose.padEnd(9) +
                 `${(pairStats[2].profitCheckCnt).toString()}` + parOpen +
-                `${(pairStats[2].profitCheckCntPct).toFixed(0).toString()}` + percentClose.padEnd(9) +
-                `${(pairStats[2].avgCheckProfit).toFixed(2).toString().padEnd(11)}` +
+                `${(pairStats[2].profitCheckCntPct).toFixed(0).toString()}` + percentClose.padEnd(7) +
+                `${(pairStats[2].avgCheckProfit).toFixed(3)}/${(pairStats[2].highestCheckProfit).toString().padEnd(8)}` +
                 `${(pairStats[2].tradeCnt).toString()}` + parOpen +
                 `${(pairStats[2].tradeCntPct).toFixed(0).toString()}` + percentClose.padEnd(7) +
                 `${(pairStats[2].tradeSucc).toString()}` + parOpen +
@@ -261,15 +276,13 @@ function outputPairStats(pairStats, totalStats) {
                 `${(pairStats[2].avgTradeProfit).toFixed(2).toString()}`)
     // log for pair4
     console.log(`${(pairStats[3].symbol).padEnd(9)}` +
-                `${(pairStats[3].numEvents).toString().padEnd(10)}` +
+                `${(pairStats[3].numEvents).toString().padEnd(9)}` +
                 `${(pairStats[3].priceDiffMet).toString()}` + parOpen +
                 `${(pairStats[3].priceDiffMetPct).toFixed(0).toString()}` + percentClose.padEnd(4) +
                 `${(pairStats[3].avgPriceDiff).toFixed(2).toString()}/${(pairStats[3].highestPriceDiff).toString().padEnd(7)} ` +
-                `${(pairStats[3].errorCnt).toString()}` + parOpen +
-                `${(pairStats[3].errorCntPct).toFixed(0).toString()}` + percentClose.padEnd(9) +
                 `${(pairStats[3].profitCheckCnt).toString()}` + parOpen +
-                `${(pairStats[3].profitCheckCntPct).toFixed(0).toString()}` + percentClose.padEnd(9) +
-                `${(pairStats[3].avgCheckProfit).toFixed(2).toString().padEnd(11)}` +
+                `${(pairStats[3].profitCheckCntPct).toFixed(0).toString()}` + percentClose.padEnd(7) +
+                `${(pairStats[3].avgCheckProfit).toFixed(3)}/${(pairStats[3].highestCheckProfit).toString().padEnd(8)}` +
                 `${(pairStats[3].tradeCnt).toString()}` + parOpen +
                 `${(pairStats[3].tradeCntPct).toFixed(0).toString()}` + percentClose.padEnd(7) +
                 `${(pairStats[3].tradeSucc).toString()}` + parOpen +
@@ -278,15 +291,13 @@ function outputPairStats(pairStats, totalStats) {
                 `${(pairStats[3].avgTradeProfit).toFixed(2).toString()}`)
     // log for pair5
     console.log(`${(pairStats[4].symbol).padEnd(9)}` +
-                `${(pairStats[4].numEvents).toString().padEnd(10)}` +
+                `${(pairStats[4].numEvents).toString().padEnd(9)}` +
                 `${(pairStats[4].priceDiffMet).toString()}` + parOpen +
                 `${(pairStats[4].priceDiffMetPct).toFixed(0).toString()}` + percentClose.padEnd(4) +
                 `${(pairStats[4].avgPriceDiff).toFixed(2).toString()}/${(pairStats[4].highestPriceDiff).toString().padEnd(7)} ` +
-                `${(pairStats[4].errorCnt).toString()}` + parOpen +
-                `${(pairStats[4].errorCntPct).toFixed(0).toString()}` + percentClose.padEnd(9) +
                 `${(pairStats[4].profitCheckCnt).toString()}` + parOpen +
-                `${(pairStats[4].profitCheckCntPct).toFixed(0).toString()}` + percentClose.padEnd(9) +
-                `${(pairStats[4].avgCheckProfit).toFixed(2).toString().padEnd(11)}` +
+                `${(pairStats[4].profitCheckCntPct).toFixed(0).toString()}` + percentClose.padEnd(7) +
+                `${(pairStats[4].avgCheckProfit).toFixed(3)}/${(pairStats[4].highestCheckProfit).toString().padEnd(8)}` +
                 `${(pairStats[4].tradeCnt).toString()}` + parOpen +
                 `${(pairStats[4].tradeCntPct).toFixed(0).toString()}` + percentClose.padEnd(7) +
                 `${(pairStats[4].tradeSucc).toString()}` + parOpen +

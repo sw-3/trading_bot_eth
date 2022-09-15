@@ -843,7 +843,11 @@ const determineProfitability = async (_routerList,
         // update stats for total # of profit checks done without error
         totalStats.profitCheckCnt++
         pairStats[_pairID].profitCheckCnt++
-        pairStats[_pairID].totalCheckProfit = pairStats[_pairID].totalCheckProfit + totalGained
+        pairStats[_pairID].totalCheckProfit = pairStats[_pairID].totalCheckProfit + 
+                                                            totalGained
+        if (totalGained > pairStats[pairID].highestCheckProfit) {
+            pairStats[pairID].highestCheckProfit = Number(totalGained).toFixed(3)
+        }
         exchangeStats[sellExchangeID].profitCheckCnt++
         exchangeStats[buyExchangeID].profitCheckCnt++
         exchangeStats[sellExchangeID].totalCheckProfit = 
