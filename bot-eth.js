@@ -561,7 +561,7 @@ const main = async () => {
     outputTotalStats(totalStats)
     outputPairStats(pairStats, totalStats)
     outputExchangeStats(exchangeStats, totalStats)
-    console.log("Waiting for swap event...")
+    console.log(`${moment().format("h:mm:ss a")}:  ` + `Waiting for swap event...`)
 }
 
 // processTradeEvent
@@ -602,7 +602,7 @@ const processTradeEvent = async (_exchangeName, _exchangeID, _pairID,
             outputTotalStats(totalStats)
             outputPairStats(pairStats, totalStats)
             outputExchangeStats(exchangeStats, totalStats)
-            console.log(`Waiting for swap event...\n`)            
+            console.log(`${moment().format("h:mm:ss a")}:  ` + `Waiting for swap event...\n`)
 
             timeOfLastStatus = currentTime
         }
@@ -626,7 +626,7 @@ const processTradeEvent = async (_exchangeName, _exchangeID, _pairID,
             outputTotalStats(totalStats)
             outputPairStats(pairStats, totalStats)
             outputExchangeStats(exchangeStats, totalStats)
-            console.log(`Waiting for swap event...\n`)
+            console.log(`${moment().format("h:mm:ss a")}:  ` + `Waiting for swap event...\n`)
         }
         return
     }
@@ -855,10 +855,12 @@ const determineProfitability = async (_routerList,
         exchangeStats[buyExchangeID].totalCheckProfit = 
                         exchangeStats[buyExchangeID].totalCheckProfit + totalGained
 
-        if (amountOut < amountIn) {
+        // we want a profit of  at least 0.01 WETH after gas costs, to do a trade
+        if ((amountOut - amountIn) < (Number(estimatedGasCost) + 0.01)) {
             return false
         }
 
+        // if we get here, we have a profitable situation
         amount = token0In
 
         return true
@@ -960,7 +962,7 @@ const executeTrade = async (_routerList, _token0Contract, _token1Contract, _toke
         outputTotalStats(totalStats)
         outputPairStats(pairStats, totalStats)
         outputExchangeStats(exchangeStats, totalStats)
-        console.log(`Waiting for swap event...\n`)
+        console.log(`${moment().format("h:mm:ss a")}:  ` + `Waiting for swap event...\n`)
     }
 }
 
