@@ -1,0 +1,96 @@
+{
+    "PROJECT_SETTINGS": {
+        "isLocal": false,
+        "isDeployed": false
+    },
+    "EXCHANGES": {
+        "UNISWAP": {
+            "NAME": "Uniswap",
+            "V2_ROUTER_02_ADDRESS": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+            "FACTORY_ADDRESS": "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"
+        },
+        "SUSHISWAP": {
+            "NAME": "SushiSwap",
+            "V2_ROUTER_02_ADDRESS": "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F",
+            "FACTORY_ADDRESS": "0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac"
+        },
+        "SHIBASWAP": {
+            "NAME": "ShibaSwap",
+            "V2_ROUTER_02_ADDRESS": "0x03f7724180AA6b939894B5Ca4314783B0b36b329",
+            "FACTORY_ADDRESS": "0x115934131916C8b277DD010Ee02de363c09d037c"
+        }
+    },
+    "TOKENS": {
+        "WETH": {
+            "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "TestData": {
+                "manipulateAccount": "",
+                "manipulateAmount": ""
+            }
+        },
+        "SHIB": {
+            "address": "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE",
+            "testData": {
+                "manipulateAccount": "0xdEAD000000000000000042069420694206942069",
+                "manipulateAmount": "4050000000000",
+                "manipulateAmountOrig": "40500000000000"
+            }
+        },
+        "USDT": {
+            "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+            "testData": {
+                "manipulateAccount": "0x69166e49d2fd23e4cbea767d7191be423a7733a5",
+                "manipulateAmount": "12400000",
+                "manipulateAmountOrig": "124000000"
+            }
+        },
+        "USDC": {
+            "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "testData": {
+                "manipulateAccount": "0xf584f8728b874a6a5c7a8d4d387c9aae9172d621",
+                "manipulateAmount": "17000000",
+                "manipulateAmountOrig": "170000000"
+            }
+        },
+        "DAI": {
+            "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+            "testData": {
+                "manipulateAccount": "0x997fd5f16c9717007244e15e1e47db5f37bd53c2",
+                "manipulateAmount": "4000000",
+                "manipulateAmountOrig": "40000000"
+            }
+        },
+        "MATIC": {
+            "address": "0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0",
+            "testData": {
+                "manipulateAccount": "0x57f1ad8d95ebd0ab51e7ab131d2fab89a15de3b1",
+                "manipulateAmount": "6000000",
+                "manipulateAmountOrig": "60000000"
+            }
+        },
+        "UFT": {
+            "address": "0x0202Be363B8a4820f3F4DE7FaF5224fF05943AB1",
+            "testData": {
+                "manipulateAccount": "0x5a52e96bacdabb82fd05763e25335261b270efcb",
+                "manipulateAmount": "300000",
+                "manipulateAmountOrig": "3000000"
+            }
+        },
+        "LINK": {
+            "address": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+            "testData": {
+                "manipulateAccount": "0x5a52e96bacdabb82fd05763e25335261b270efcb",
+                "manipulateAmount": "300000",
+                "manipulateAmountOrig": "3000000"
+            }
+        },
+        "MANA": {
+            "address": "0x0F5D2fB29fb7d3CFeE444a200298f468908cC942",
+            "testData": {
+                "manipulateAccount": "0xcffad3200574698b78f32232aa9d63eabd290703",
+                "manipulateAmount": "2200000",
+                "manipulateAmountOrig": "22000000"
+            }
+        }
+    }
+}
