@@ -21,16 +21,14 @@ const {
         outputTotalStats, outputPairStats, outputExchangeStats
     } = require('./helpers/helpers')
 
-// get the initialized Exchange/Token/contract info
+// get the initialized Exchange/Token/Contract/Stats info
 const { 
     uFactory, uRouter, uName,
     sFactory, sRouter, sName,
     tFactory, tRouter, tName,
     web3, arbitrage, 
-    ARBFORaddr, WETHaddr, LINKaddr, 
-    MATICaddr, DAIaddr, SHIBaddr, 
-    MANAaddr, USDTaddr, USDCaddr, 
-    RAILaddr, UFTaddr
+    exchangesActive, pairsActive,
+    ARBFORaddr, PAIR1addr, PAIR2addr, PAIR3addr, PAIR4addr, PAIR5addr
 } = require('./helpers/initialization')
 
 // get the initialized statistics variables
@@ -69,16 +67,6 @@ let exchangePrices = [
     }
 ]
 
-// -- CONFIGURE WHICH EXCHANGES & PAIRS ARE MONITORED BY THE BOT -- //
-
-// The 3 exchanges, in order, are Uniswap, Sushiswap, and Shibaswap
-// Set them to true, if using
-const exchangesActive = [true, true, false]
-
-// Up to 5 pairs monitored.  Set the last one(s) to false if using fewer
-const pairsActive = [true, true, true, true, true]
-
-
 // -- MAIN PROGRAM -- //
 
 const main = async () => {
@@ -109,27 +97,27 @@ const main = async () => {
     const arbForToken = tokenAndContract.token
     const arbForTokenContract = tokenAndContract.tokenContract
 
-    tokenAndContract = await getTokenAndContract(SHIBaddr)
+    tokenAndContract = await getTokenAndContract(PAIR1addr)
     const arbAgainstToken1 = tokenAndContract.token
     const arbAgainstToken1Contract = tokenAndContract.tokenContract
     pairStats[0].symbol = arbAgainstToken1.symbol
 
-    tokenAndContract = await getTokenAndContract(MANAaddr)
+    tokenAndContract = await getTokenAndContract(PAIR2addr)
     const arbAgainstToken2 = tokenAndContract.token
     const arbAgainstToken2Contract = tokenAndContract.tokenContract
     pairStats[1].symbol = arbAgainstToken2.symbol
 
-    tokenAndContract = await getTokenAndContract(UFTaddr)
+    tokenAndContract = await getTokenAndContract(PAIR3addr)
     const arbAgainstToken3 = tokenAndContract.token
     const arbAgainstToken3Contract = tokenAndContract.tokenContract
     pairStats[2].symbol = arbAgainstToken3.symbol
 
-    tokenAndContract = await getTokenAndContract(RAILaddr)
+    tokenAndContract = await getTokenAndContract(PAIR4addr)
     const arbAgainstToken4 = tokenAndContract.token
     const arbAgainstToken4Contract = tokenAndContract.tokenContract
     pairStats[3].symbol = arbAgainstToken4.symbol
 
-    tokenAndContract = await getTokenAndContract(MATICaddr)
+    tokenAndContract = await getTokenAndContract(PAIR5addr)
     const arbAgainstToken5 = tokenAndContract.token
     const arbAgainstToken5Contract = tokenAndContract.tokenContract
     pairStats[4].symbol = arbAgainstToken5.symbol
@@ -819,7 +807,9 @@ const processTradeEvent = async (_exchangeName, _exchangeID, _pairID,
 
 // determineRouterPath
 // determine the exchange to buy on, and to sell on, for profit
-// Note: routerPath is a list of all routers, ordered from high to low price of the pair
+// Return Value:
+//   Array of routers, ordered from high to low price of the pair, OR
+//   null   (if the price difference did not meet the threshold)
 const deterimineRouterPath = async (exchangeName, exchangeID, pairID,
                                     _arbForToken, _arbAgainstToken, uPair, sPair, tPair) => {
     isExecuting = true
@@ -969,6 +959,11 @@ const deterimineRouterPath = async (exchangeName, exchangeID, pairID,
     }
 }
 
+// determineProfitability
+// Determines whether the trade will actually be profitable, based on prices and reserve
+// amounts and the cost of gas.
+// Return Value:
+//    The amount of the flashloan needed, OR 0 if not profitable
 const determineProfitability = async (_routerList, 
                                         _arbForTokenContract, 
                                         _arbForToken, 
@@ -1099,10 +1094,13 @@ const determineProfitability = async (_routerList,
         console.log(error)
         console.log(`\nError occured while trying to determine profitability...\n`)
         console.log(`This can typically happen because an issue with reserves, see README for more information.\n`)
-        return false
+        return 0
     }
 }
 
+// executeTrade
+// Routine to call the arbitrage smart contract to execute the trades.
+// Return Value:  None.   (Should return some kind of receipt??)
 const executeTrade = async (_routerList, 
                             _arbForTokenContract, 
                             _arbAgainstTokenContract, 

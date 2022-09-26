@@ -50,26 +50,60 @@ const uName = config.EXCHANGES.UNISWAP.NAME
 const sName = config.EXCHANGES.SUSHISWAP.NAME
 const tName = config.EXCHANGES.SHIBASWAP.NAME
 
-// load token information, starting with token to use as the Arb For
-const ARBFORaddr = config.TOKENS.WETH.address
-const WETHaddr = config.TOKENS.WETH.address
-const USDTaddr = config.TOKENS.USDT.address
-const USDCaddr = config.TOKENS.USDC.address
-const DAIaddr = config.TOKENS.DAI.address
-const SHIBaddr = config.TOKENS.SHIB.address
-const UFTaddr = config.TOKENS.UFT.address           // not on ShibaSwap
-const MATICaddr = config.TOKENS.MATIC.address
-const LINKaddr = config.TOKENS.LINK.address
-const MANAaddr = config.TOKENS.MANA.address
-const RAILaddr = config.TOKENS.RAIL.address         // not on ShibaSwap
-
 // load Arbitrage contract
 const IArbitrage = require('../build/contracts/Arbitrage.json')
 const arbitrage = new web3.eth.Contract(IArbitrage.abi, IArbitrage.networks[1].address);
 
+// -- CONFIGURE WHICH EXCHANGES & PAIRS ARE MONITORED BY THE BOT -- //
+// ---------------  (defined in config.json file)  ---------------- //
 
-// -- STATS TRACKING VARIABLES -- //
+// The 3 exchanges, in order, are Uniswap, Sushiswap, and Shibaswap
+// Set them to true, if using
+const exchangesActive = [false, false, false]
+if (config.EXCHANGES.UNISWAP.MONITOR) { exchangesActive[0] = true }
+if (config.EXCHANGES.SUSHISWAP.MONITOR) { exchangesActive[1] = true }
+if (config.EXCHANGES.SHIBASWAP.MONITOR) { exchangesActive[2] = true }
 
+// load the base token to be used in each pair (defined in config.json)
+const ARBFORTOKEN = config.PROJECT_SETTINGS.baseToken
+const ARBFORaddr = config.TOKENS[ARBFORTOKEN].address
+
+// load the 5 tokens to pair with the base token (defined in config.json)
+let PAIR1addr="", PAIR2addr="", PAIR3addr="", PAIR4addr="", PAIR5addr=""
+const pairsActive = [false, false, false, false, false]
+
+const PAIR1TOKEN = config.PROJECT_SETTINGS.pairTokens[0]
+if (PAIR1TOKEN != "") {
+    PAIR1addr = config.TOKENS[PAIR1TOKEN].address
+    pairsActive[0] = true
+}
+
+const PAIR2TOKEN = config.PROJECT_SETTINGS.pairTokens[1]
+if (PAIR2TOKEN != "") {
+    PAIR2addr = config.TOKENS[PAIR2TOKEN].address
+    pairsActive[1] = true
+}
+
+const PAIR3TOKEN = config.PROJECT_SETTINGS.pairTokens[2]
+if (PAIR3TOKEN != "") {
+    PAIR3addr = config.TOKENS[PAIR3TOKEN].address
+    pairsActive[2] = true
+}
+
+const PAIR4TOKEN = config.PROJECT_SETTINGS.pairTokens[3]
+if (PAIR4TOKEN != "") {
+    PAIR4addr = config.TOKENS[PAIR4TOKEN].address
+    pairsActive[3] = true
+}
+
+const PAIR5TOKEN = config.PROJECT_SETTINGS.pairTokens[4]
+if (PAIR5TOKEN != "") {
+    PAIR5addr = config.TOKENS[PAIR5TOKEN].address
+    pairsActive[4] = true
+}
+
+// -- INITIALIZE STATS TRACKING VARIABLES -- //
+// ----------------------------------------- //
 var totalStats =
     {
         startTime: null,
@@ -276,17 +310,14 @@ module.exports = {
     tName,
     web3,
     arbitrage,
+    exchangesActive,
+    pairsActive,
     ARBFORaddr,
-    WETHaddr,
-    LINKaddr,
-    MATICaddr,
-    DAIaddr,
-    SHIBaddr,
-    MANAaddr,
-    USDTaddr,
-    USDCaddr,
-    RAILaddr,
-    UFTaddr,
+    PAIR1addr,
+    PAIR2addr,
+    PAIR3addr,
+    PAIR4addr,
+    PAIR5addr,
     totalStats,
     pairStats,
     exchangeStats
