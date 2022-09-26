@@ -1,5 +1,6 @@
 require("dotenv").config();
 const config = require('../config.json')
+const HDWalletProvider = require("@truffle/hdwallet-provider");
 
 const Web3 = require('web3')
 let web3
@@ -10,6 +11,23 @@ if (!config.PROJECT_SETTINGS.isLocal) {
     web3 = new Web3('ws://127.0.0.1:7545')
 }
 
+// create a signing account from a private key
+// (not 100% sure this works with the current smart contract)
+//const signer = web3.eth.accounts.privateKeyToAccount(process.env.PRIVATE_KEY)
+//web3.eth.accounts.wallet.add(signer);
+
+/*   this HDWalletProvider hangs the bot...
+if (!config.PROJECT_SETTINGS.isLocal) {
+    const provider = new HDWalletProvider({
+        mnemonic: process.env.MNEMONIC_PHRASE,
+        providerOrUrl: `wss://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
+        addressIndex: process.env.ADDRESS_INDEX
+    })
+    web3 = new Web3(provider)
+} else {
+    web3 = new Web3('ws://127.0.0.1:7545')
+}
+*/
 const IUniswapV2Router02 = require('@uniswap/v2-periphery/build/IUniswapV2Router02.json')
 const IUniswapV2Factory = require("@uniswap/v2-core/build/IUniswapV2Factory.json")
 
@@ -26,16 +44,18 @@ const uName = config.EXCHANGES.UNISWAP.NAME
 const sName = config.EXCHANGES.SUSHISWAP.NAME
 const tName = config.EXCHANGES.SHIBASWAP.NAME
 
-// load token-pair information
+// load token information, starting with token to use as the Arb For
+const ARBFORaddr = config.TOKENS.WETH.address
 const WETHaddr = config.TOKENS.WETH.address
 const USDTaddr = config.TOKENS.USDT.address
 const USDCaddr = config.TOKENS.USDC.address
 const DAIaddr = config.TOKENS.DAI.address
 const SHIBaddr = config.TOKENS.SHIB.address
-const UFTaddr = config.TOKENS.UFT.address
+const UFTaddr = config.TOKENS.UFT.address           // not on ShibaSwap
 const MATICaddr = config.TOKENS.MATIC.address
 const LINKaddr = config.TOKENS.LINK.address
 const MANAaddr = config.TOKENS.MANA.address
+const RAILaddr = config.TOKENS.RAIL.address         // not on ShibaSwap
 
 // load Arbitrage contract
 const IArbitrage = require('../build/contracts/Arbitrage.json')
@@ -60,7 +80,7 @@ var totalStats =
 
 var pairStats = [
     { 
-        symbol: 'LINK',
+        symbol: '',
         numEvents: 0,
         priceDiffMet: 0,
         priceDiffMetPct: 0,
@@ -82,7 +102,7 @@ var pairStats = [
         avgTradeProfit: 0
     },
     {
-        symbol: 'MATIC',
+        symbol: '',
         numEvents: 0,
         priceDiffMet: 0,
         priceDiffMetPct: 0,
@@ -104,7 +124,7 @@ var pairStats = [
         avgTradeProfit: 0
     },
     {
-        symbol: 'DAI',
+        symbol: '',
         numEvents: 0,
         priceDiffMet: 0,
         priceDiffMetPct: 0,
@@ -126,7 +146,7 @@ var pairStats = [
         avgTradeProfit: 0
     },
     {
-        symbol: 'SHIB',
+        symbol: '',
         numEvents: 0,
         priceDiffMet: 0,
         priceDiffMetPct: 0,
@@ -148,7 +168,7 @@ var pairStats = [
         avgTradeProfit: 0
     },
     {
-        symbol: 'MANA',
+        symbol: '',
         numEvents: 0,
         priceDiffMet: 0,
         priceDiffMetPct: 0,
@@ -249,12 +269,17 @@ module.exports = {
     tName,
     web3,
     arbitrage,
+    ARBFORaddr,
     WETHaddr,
     LINKaddr,
     MATICaddr,
     DAIaddr,
     SHIBaddr,
     MANAaddr,
+    USDTaddr,
+    USDCaddr,
+    RAILaddr,
+    UFTaddr,
     totalStats,
     pairStats,
     exchangeStats
