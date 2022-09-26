@@ -43,8 +43,6 @@ let pairID = 0              // indicator for which trading pair we are on (0 .. 
 let exchangeID = 0          // indicator for which exchange we are on (0, 1, 2)
 let isExecuting = false
 let isInitialCheck = false
-let profitabilityErrorCnt = 0
-let flashLoanAmount = 0
 let timeOfLastStatus = moment()     // to allow auto-output of status every 5 minutes
 
 // store the latest known price per pair per exchange
@@ -788,18 +786,14 @@ console.log(`_tPair = ${_tPair.address}`)
         return
     }
 
-    // find the avg price between the 2 exchanges, for a later gas cost estimate in the Arb For token
-//    const maxPrice = routerPath[0].price 
-//    const minPrice = routerPath[2].price 
-
-    const isProfitable = await determineProfitability(
+    const flashLoanAmount = await determineProfitability(
                                                 routerPath, 
                                                 _arbForTokenContract, 
                                                 _arbForToken, 
                                                 _arbAgainstToken,
                                                 _pairID)
 
-    if (!isProfitable) {
+    if (flashLoanAmount === 0) {
         console.log(`Transaction not profitable.\nNo Arbitrage Currently Available`)
      
         if (!isInitialCheck) { 
@@ -816,7 +810,8 @@ console.log(`_tPair = ${_tPair.address}`)
                                     _arbForTokenContract, 
                                     _arbAgainstTokenContract, 
                                     _arbForToken,
-                                    _pairID)
+                                    _pairID,
+                                    flashLoanAmount)
 
     return receipt
 }
@@ -1113,13 +1108,11 @@ const determineProfitability = async (_routerList,
 
         // profit must be 2x the cost in gas fees, otherwise not profitable enough
         if ( (amountOut - amountIn) < (gasCostInArbFor * 2) ) {
-            return false
+            return 0
         }
 
-        // if we get here, we have a profitable situation
-        flashLoanAmount = token0In
-
-        return true
+        // if we get here, we are profitable; return token0In as the flashloan amount
+        return token0In
 
     } catch (error) {
         // update error stats
@@ -1128,7 +1121,6 @@ const determineProfitability = async (_routerList,
         exchangeStats[buyExchangeID].errorCnt++
         exchangeStats[sellExchangeID].errorCnt++
 
-        profitabilityErrorCnt++
         console.log(error)
         console.log(`\nError occured while trying to determine profitability...\n`)
         console.log(`This can typically happen because an issue with reserves, see README for more information.\n`)
@@ -1139,7 +1131,9 @@ const determineProfitability = async (_routerList,
 const executeTrade = async (_routerList, 
                             _arbForTokenContract, 
                             _arbAgainstTokenContract, 
-                            _arbForToken, _pairID) => {
+                            _arbForToken, 
+                            _pairID,
+                            _flashLoanAmount) => {
     console.log(`Attempting Arbitrage...\n`)
 
     let firstExchange, secondExchange
@@ -1172,7 +1166,7 @@ const executeTrade = async (_routerList,
     exchangeStats[secondExchange].tradeCnt++
 
     if (config.PROJECT_SETTINGS.isDeployed) {
-        await arbitrage.methods.executeTrade(firstExchange, secondExchange, _arbForTokenContract._address, _arbAgainstTokenContract._address, flashLoanAmount).send({ from: account, gas: gas })
+        await arbitrage.methods.executeTrade(firstExchange, secondExchange, _arbForTokenContract._address, _arbAgainstTokenContract._address, _flashLoanAmount).send({ from: account, gas: gas })
     } else {
         console.log(`\nNot deployed; trade not executed.\n\n`)
     }
