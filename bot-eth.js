@@ -4,18 +4,9 @@ require('./helpers/server')
 require("dotenv").config();
 const Big = require('big.js');
 var moment = require('moment');
-
-const {
-    BigNumber,
-    FixedFormat,
-    FixedNumber,
-    formatFixed,
-    parseFixed,
-    // Types
-    BigNumberish
-} = require("@ethersproject/bignumber");
-
 const config = require('./config.json')
+
+// get helper functions
 const { 
         getTokenAndContract, getPairContract, calculatePrice, 
         getEstimatedReturn, getReserves,
@@ -23,42 +14,35 @@ const {
         outputTotalStats, outputPairStats, outputExchangeStats
     } = require('./helpers/helpers')
 
-// get the Exchange/Token info
+// get the initialized Exchange/Token/contract info
 const { 
     uFactory, uRouter, uName,
     sFactory, sRouter, sName,
     tFactory, tRouter, tName,
-    web3, signer, arbitrage, 
+    web3, arbitrage, 
     ARBFORaddr, WETHaddr, LINKaddr, 
     MATICaddr, DAIaddr, SHIBaddr, 
     MANAaddr, USDTaddr, USDCaddr, 
     RAILaddr, UFTaddr
 } = require('./helpers/initialization')
 
-// get the statistics variables
+// get the initialized statistics variables
 var {totalStats, pairStats, exchangeStats} = require('./helpers/initialization')
 
 // -- .ENV VALUES HERE -- //
 const account = process.env.ACCOUNT // Account to recieve profit
-const units = process.env.UNITS // Used for price display/reporting
+const units = process.env.UNITS     // Used for price display/reporting
 const difference = process.env.PRICE_DIFFERENCE
 const percentToBuy = process.env.PERCENT_TO_BUY
 const gas = process.env.GAS_LIMIT
-const estimatedGasCost = process.env.GAS_PRICE // Estimated Gas: 0.008453220000006144 ETH + ~10%
+const estimatedGasCost = process.env.GAS_PRICE
 const gasCostInArbFor = process.env.EST_GAS_IN_ARBFOR
-
-// create a signing account from a private key
-//const signer = web3.eth.accounts.privateKeyToAccount(process.env.PRIVATE_KEY)
-//web3.eth.accounts.wallet.add(signer);
 
 // -- GLOBALS -- //
 let pairID = 0              // indicator for which trading pair we are on (0 .. numPairs-1)
 let exchangeID = 0          // indicator for which exchange we are on (0, 1, 2)
 let isExecuting = false
 let isInitialCheck = false
-let runExecutedTradeCnt = 0
-let highPriceDiffCnt = 0
-let runTotalGain = 0
 let profitabilityErrorCnt = 0
 let flashLoanAmount = 0
 let timeOfLastStatus = moment()     // to allow auto-output of status every 5 minutes
@@ -804,9 +788,6 @@ console.log(`_tPair = ${_tPair.address}`)
         return
     }
 
-    // if we get here, price difference was past our threshold ... record it
-    highPriceDiffCnt++
-
     // find the avg price between the 2 exchanges, for a later gas cost estimate in the Arb For token
 //    const maxPrice = routerPath[0].price 
 //    const minPrice = routerPath[2].price 
@@ -1207,22 +1188,18 @@ const executeTrade = async (_routerList,
     const balanceAfter = await _arbForTokenContract.methods.balanceOf(account).call()
     const ethBalanceAfter = await web3.eth.getBalance(account)
 
-//    const balanceDifference = balanceAfter - balanceBefore
-//    const totalSpent = ethBalanceBefore - ethBalanceAfter
     const arbForBalanceDifference = balanceAfter - balanceBefore
     const totalEthSpent = ethBalanceBefore - ethBalanceAfter
 
-//    runTotalGain = runTotalGain + Number(web3.utils.fromWei((balanceDifference - totalSpent).toString(), 'ether'))
-    runTotalGain = runTotalGain + Number(strToDecimal(arbForBalanceDifference, decimalsFor)) - gasCostInArbFor
-    runTotalGain = Math.round(runTotalGain * 1000) / 1000
+    let tradeTotalGain = Number(strToDecimal(arbForBalanceDifference, decimalsFor)) - gasCostInArbFor
+    tradeTotalGain = Math.round(tradeTotalGain * 1000) / 1000
     
     // update stats for profits
-    runExecutedTradeCnt++
-    if (runTotalGain > 0) {
-        totalStats.profits = totalStats.profits + runTotalGain
-        pairStats[_pairID].tradeProfits = pairStats[_pairID].tradeProfits + runTotalGain
-        exchangeStats[firstExchange].tradeProfits = exchangeStats[firstExchange].tradeProfits + runTotalGain
-        exchangeStats[secondExchange].tradeProfits = exchangeStats[secondExchange].tradeProfits + runTotalGain
+    if (tradeTotalGain > 0) {
+        totalStats.profits = totalStats.profits + tradeTotalGain
+        pairStats[_pairID].tradeProfits = pairStats[_pairID].tradeProfits + tradeTotalGain
+        exchangeStats[firstExchange].tradeProfits = exchangeStats[firstExchange].tradeProfits + tradeTotalGain
+        exchangeStats[secondExchange].tradeProfits = exchangeStats[secondExchange].tradeProfits + tradeTotalGain
     }
     
     console.log(`    ArbFor = ${_arbForToken.symbol}`)
