@@ -11,23 +11,29 @@ if (!config.PROJECT_SETTINGS.isLocal) {
     web3 = new Web3('ws://127.0.0.1:7545')
 }
 
-// create a signing account from a private key
-// (not 100% sure this works with the current smart contract)
-//const signer = web3.eth.accounts.privateKeyToAccount(process.env.PRIVATE_KEY)
-//web3.eth.accounts.wallet.add(signer);
+/*****************************************************************************
+ * TODO:  figure out how to create a signed transaction for the trades
+ *****************************************************************************
+ * 
+ * // Option 1:  create a signing account from a private key
+ * // (not 100% sure this works with the current smart contract)
+ * const signer = web3.eth.accounts.privateKeyToAccount(process.env.PRIVATE_KEY)
+ * web3.eth.accounts.wallet.add(signer);
 
-/*   this HDWalletProvider hangs the bot...
-if (!config.PROJECT_SETTINGS.isLocal) {
-    const provider = new HDWalletProvider({
-        mnemonic: process.env.MNEMONIC_PHRASE,
-        providerOrUrl: `wss://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
-        addressIndex: process.env.ADDRESS_INDEX
-    })
-    web3 = new Web3(provider)
-} else {
-    web3 = new Web3('ws://127.0.0.1:7545')
-}
-*/
+ * // Option 2:  this HDWalletProvider hangs the bot...
+ * if (!config.PROJECT_SETTINGS.isLocal) {
+ *     const provider = new HDWalletProvider({
+ *         mnemonic: process.env.MNEMONIC_PHRASE,
+ *         providerOrUrl: `wss://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
+ *         addressIndex: process.env.ADDRESS_INDEX
+ *     })
+ *     web3 = new Web3(provider)
+ * } else {
+ *     web3 = new Web3('ws://127.0.0.1:7545')
+ * }
+ *
+ ****************************************************************************/
+
 const IUniswapV2Router02 = require('@uniswap/v2-periphery/build/IUniswapV2Router02.json')
 const IUniswapV2Factory = require("@uniswap/v2-core/build/IUniswapV2Factory.json")
 
@@ -61,7 +67,8 @@ const RAILaddr = config.TOKENS.RAIL.address         // not on ShibaSwap
 const IArbitrage = require('../build/contracts/Arbitrage.json')
 const arbitrage = new web3.eth.Contract(IArbitrage.abi, IArbitrage.networks[1].address);
 
-// -- STATS VARIABLES -- //
+
+// -- STATS TRACKING VARIABLES -- //
 
 var totalStats =
     {

@@ -1,109 +1,23 @@
+/* helpers.js
+ * Helper functions for the arbitrage bot 
+ */
 require("dotenv").config();
 const config = require("../config.json")
-//const HDWalletProvider = require("@truffle/hdwallet-provider");
 
 var moment = require('moment');
 const Big = require('big.js');
-//const Web3 = require('web3');
-//let web3
 
 const url = ''
 const percentToBuy = process.env.PERCENT_TO_BUY
 const diffSetting = process.env.PRICE_DIFFERENCE
 const estimatedGasCost = process.env.GAS_PRICE
 
-//if (!config.PROJECT_SETTINGS.isLocal) {
-//    web3 = new Web3(`wss://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`)
-//} else {
-//    web3 = new Web3('ws://127.0.0.1:7545')
-//}
-
 // get the web3 connection
 const { web3 } = require('./initialization')
-
-//if (!config.PROJECT_SETTINGS.isLocal) {
-//    const provider = new HDWalletProvider({
-//        privateKeys: [process.env.PRIVATE_KEY],
-//        providerOrUrl: `wss://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`
-//    })
-//    web3 = new Web3(provider)
-//} else {
-//    web3 = new Web3('ws://127.0.0.1:7545')
-//}
 
 const { ChainId, Token } = require("@uniswap/sdk")
 const IUniswapV2Pair = require("@uniswap/v2-core/build/IUniswapV2Pair.json")
 const IERC20 = require('@openzeppelin/contracts/build/contracts/ERC20.json')
-
-/********************   COMMENTED OUT   ****************************************************
-    I don't like this mammoth helper with 6 inputs and 12 outputs!
-    simplify and call multiple times..
-
-async function getTokenAndContract(_arbForTokenAddr, 
-                                    _arbAgainstToken1Addr,
-                                    _arbAgainstToken2Addr,
-                                    _arbAgainstToken3Addr,
-                                    _arbAgainstToken4Addr,
-                                    _arbAgainstToken5Addr) 
-{
-    const arbForTokenContract = new web3.eth.Contract(IERC20.abi, _arbForTokenAddr)
-    const arbAgainstToken1Contract = new web3.eth.Contract(IERC20.abi, _arbAgainstToken1Addr)
-    const arbAgainstToken2Contract = new web3.eth.Contract(IERC20.abi, _arbAgainstToken2Addr)
-    const arbAgainstToken3Contract = new web3.eth.Contract(IERC20.abi, _arbAgainstToken3Addr)
-    const arbAgainstToken4Contract = new web3.eth.Contract(IERC20.abi, _arbAgainstToken4Addr)
-    const arbAgainstToken5Contract = new web3.eth.Contract(IERC20.abi, _arbAgainstToken5Addr)
-
-    const arbForToken = new Token(
-        ChainId.MAINNET,
-        _arbForTokenAddr,
-        await arbForTokenContract.methods.decimals().call(),
-        await arbForTokenContract.methods.symbol().call(),
-        await arbForTokenContract.methods.name().call()
-    )
-    const arbAgainstToken1 = new Token(
-        ChainId.MAINNET,
-        _arbAgainstToken1Addr,
-        await arbAgainstToken1Contract.methods.decimals().call(),
-        await arbAgainstToken1Contract.methods.symbol().call(),
-        await arbAgainstToken1Contract.methods.name().call()
-    )
-    const arbAgainstToken2 = new Token(
-        ChainId.MAINNET,
-        _arbAgainstToken2Addr,
-        await arbAgainstToken2Contract.methods.decimals().call(),
-        await arbAgainstToken2Contract.methods.symbol().call(),
-        await arbAgainstToken2Contract.methods.name().call()
-    )
-    const arbAgainstToken3 = new Token(
-        ChainId.MAINNET,
-        _arbAgainstToken3Addr,
-        await arbAgainstToken3Contract.methods.decimals().call(),
-        await arbAgainstToken3Contract.methods.symbol().call(),
-        await arbAgainstToken3Contract.methods.name().call()
-    )
-    const arbAgainstToken4 = new Token(
-        ChainId.MAINNET,
-        _arbAgainstToken4Addr,
-        await arbAgainstToken4Contract.methods.decimals().call(),
-        await arbAgainstToken4Contract.methods.symbol().call(),
-        await arbAgainstToken4Contract.methods.name().call()
-    )
-    const arbAgainstToken5 = new Token(
-        ChainId.MAINNET,
-        _arbAgainstToken5Addr,
-        await arbAgainstToken5Contract.methods.decimals().call(),
-        await arbAgainstToken5Contract.methods.symbol().call(),
-        await arbAgainstToken5Contract.methods.name().call()
-    )
-
-    return { arbForToken, arbForTokenContract,
-                arbAgainstToken1, arbAgainstToken1Contract,
-                arbAgainstToken2, arbAgainstToken2Contract,
-                arbAgainstToken3, arbAgainstToken3Contract,
-                arbAgainstToken4, arbAgainstToken4Contract,
-                arbAgainstToken5, arbAgainstToken5Contract }
-}
-****************  END COMMENTED OUT   ***************************************************/
 
 async function getTokenAndContract(_tokenAddr) {
 
@@ -136,14 +50,12 @@ async function getPairContract(_V2Factory, _token0, _token1) {
     return pairContract
 }
 
-/* async function getReserves(_pairContract) {
-    const reserves = await _pairContract.methods.getReserves().call()
-    return [reserves.reserve0, reserves.reserve1]
-} */
-
+// for the given pair contract and tokens, get the reserves on the exchange
 async function getReserves(_pairContract, _token0, _token1) {
     const reserves = await _pairContract.methods.getReserves().call()
     reservesToken0 = await _pairContract.methods.token0().call()
+
+    // ensure that the reserve order returned matches the expected order
     if (reservesToken0 === _token0.address) {
         return [reserves.reserve0, reserves.reserve1]
     } else {
@@ -170,10 +82,6 @@ async function calculatePrice(_pairContract, _decimals0, _decimals1, _token0, _t
     }
 }
 
-// function calculateDifference(uPrice, sPrice) {
-//     return (((uPrice - sPrice) / sPrice) * 100).toFixed(2)
-// }
-
 async function getEstimatedReturn(amount, _routerPath, _token0, _token1) {
     const trade1 = await _routerPath[0].methods.getAmountsOut(amount, [_token0.address, _token1.address]).call()
     const trade2 = await _routerPath[1].methods.getAmountsOut(trade1[1], [_token1.address, _token0.address]).call()
@@ -184,8 +92,8 @@ async function getEstimatedReturn(amount, _routerPath, _token0, _token1) {
     return { amountIn, amountOut }
 }
 
-// strToDecimal:   function similar to fromWei() for eth.
-// converts a number string (with no decimal) to a string with any decimal precision
+// strToDecimal:   function similar to fromWei() for ETH.
+// converts a number string (with no decimal) to a string, but with any decimal precision
 // example:  strToDecimal('123456789', 5) = '1234.56789'
 function strToDecimal(amountStr, _decimals) {
     _decimals = 10 ** _decimals
@@ -198,7 +106,7 @@ function strToDecimal(amountStr, _decimals) {
 function strRmDecimal(amountStr, _decimals) {
     // ensure our number doesn't go longer than precision of 21 places
     // (because .js math then uses scientific notation, making the string invalid)
-    // this truncates to 8 places after decimal, allowing billions of tokens to work
+    // this truncates to 8 places after decimal, safely allowing 999,999,999,999 tokens
     let decimalsF
     if (_decimals > 8) {
         decimalsF = 8
@@ -226,7 +134,7 @@ function outputTotalStats(totalStats) {
     const percentClose = '%)'
 
     // set up the current Run Time
-    const diffTime = moment().diff(totalStats.startTime)           // miliseconds since startTime until now
+    const diffTime = moment().diff(totalStats.startTime)  // miliseconds since startTime until now
     const dateDiffTime = moment(diffTime + 21600000)    // add 6 hours for local time, in miliseconds
     const diffTimeArray = dateDiffTime.toArray()        // capture run time as a Date/Time, in an array
     const runDays = diffTimeArray[2] - 1                // subtract 1 since Date format starts at Jan 1
@@ -313,11 +221,6 @@ function outputPairStats(pairStats, totalStats, pairsActive) {
         }
 
         pairStats[pairID].avgPriceDiff = pairStats[pairID].totalPriceDiffAmt / pairStats[pairID].numEvents
-
-//        console.log(`totalCheckProfit for pairID ${pairID}   = ${pairStats[pairID].totalCheckProfit}`)
-//        console.log(`profitCheckCnt for pairID ${pairID}     = ${pairStats[pairID].profitCheckCnt}`)
-//        console.log(`avgCheckProfit for pairID ${pairID}     = ${pairStats[pairID].avgCheckProfit}`)
-//        console.log(`highestCheckProfit for PairID ${pairID} = ${pairStats[pairID].highestCheckProfit}`)
     }
 
     console.log(`------------------------------------------------------------------------------------------------------------------`)

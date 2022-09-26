@@ -1,8 +1,15 @@
+/**********************************************
+ * bot-eth.js                                 *
+ * An arbitrage bot for the Ethereum network. *
+ *                                            *
+ * For educational purposes only...           *
+ *                   ...use at your own risk! *
+ *********************************************/
+
 // -- HANDLE INITIAL SETUP -- //
 
 require('./helpers/server')
 require("dotenv").config();
-const Big = require('big.js');
 var moment = require('moment');
 const config = require('./config.json')
 
@@ -62,13 +69,17 @@ let exchangePrices = [
     }
 ]
 
-// which exchanges are active?
-//      The 3 exchanges, in order, are Uniswap, Sushiswap, and Shibaswap
-//      Set them to true, if using
+// -- CONFIGURE WHICH EXCHANGES & PAIRS ARE MONITORED BY THE BOT -- //
+
+// The 3 exchanges, in order, are Uniswap, Sushiswap, and Shibaswap
+// Set them to true, if using
 const exchangesActive = [true, true, false]
 
-// how many pairs are active?  Up to 5.  Set the last one(s) to false if using fewer
+// Up to 5 pairs monitored.  Set the last one(s) to false if using fewer
 const pairsActive = [true, true, true, true, true]
+
+
+// -- MAIN PROGRAM -- //
 
 const main = async () => {
     // record startTime for stats
@@ -741,16 +752,6 @@ const processTradeEvent = async (_exchangeName, _exchangeID, _pairID,
                                     _arbAgainstTokenContract,
                                     _uPair, _sPair, _tPair) => {
 
-/*console.log(`_exchangeName, exchID, PairID = ${_exchangeName}, ${_exchangeID}, ${_pairID}`)
-console.log(`_arbForToken = ${_arbForToken.address}`)
-console.log(`_arbAgainstToken = ${_arbAgainstToken.address}`)
-console.log(`_arbForTokenContract = ${_arbForTokenContract.address}`)
-console.log(`_arbAgainstTokenContract = ${_arbAgainstTokenContract.address}`)
-console.log(`_uPair = ${_uPair.address}`)
-console.log(`_sPair = ${_sPair.address}`)
-console.log(`_tPair = ${_tPair.address}`)
-*/
-
     // update stats
     totalStats.numEvents++
     pairStats[pairID].numEvents++
@@ -829,7 +830,6 @@ const deterimineRouterPath = async (exchangeName, exchangeID, pairID,
                     `looking for arbitrage...`)
     }
     const currentBlock = await web3.eth.getBlockNumber()
-//    console.log(`currentBlock = ${currentBlock}`)
 
     // handle different decimal precisions
     const decimalsFor = _arbForToken.decimals
@@ -883,7 +883,6 @@ const deterimineRouterPath = async (exchangeName, exchangeID, pairID,
     // if any exchange is not used, its price will be 0, which would always be the "low" price.
     // we need to change its price so it will not be low or high (make it in the middle)
 
-//console.log(`uPrice | sPrice | tPrice = ${uPrice} | ${sPrice} | ${tPrice}`)
     if (uPrice === 0) {
         uPrice = (Number(sPrice) + Number(tPrice)) / 2
     }
@@ -893,11 +892,6 @@ const deterimineRouterPath = async (exchangeName, exchangeID, pairID,
     else if (tPrice === 0) {
         tPrice = (Number(uPrice) + Number(sPrice)) / 2
     }
-//console.log(`uPrice | sPrice | tPrice = ${uPrice} | ${sPrice} | ${tPrice}`)
-
-//    const uFPrice = Number(uPrice).toFixed(units)
-//    const sFPrice = Number(sPrice).toFixed(units)
-//    const tFPrice = Number(tPrice).toFixed(units)
 
     let maxRouter, minRouter, maxPrice, minPrice
 
@@ -1006,13 +1000,9 @@ const determineProfitability = async (_routerList,
     if (exchangeToSell == 'SushiSwap') {sellExchangeID = 1}
     else if (exchangeToSell == 'ShibaSwap') {sellExchangeID = 2}
 
-//    console.log(`Reserves of (${_arbForToken.symbol} ${decimalsFor}) on ${exchangeToBuy}:  ${reservesOnBuyDex[0]}`)
-//    console.log(`Reserves of (${_arbForToken.symbol} ${decimalsFor}) on ${exchangeToSell}:  ${reservesOnSellDex[0]}`)
     console.log(`Reserves of (${_arbAgainstToken.symbol} ${decimalsAgainst}) on ${exchangeToBuy}:  ${reservesOnBuyDex[1]}`)
     console.log(`Reserves of (${_arbAgainstToken.symbol} ${decimalsAgainst}) on ${exchangeToSell}:  ${reservesOnSellDex[1]}`)
 
-//    let arbForReservesOnBuyDex = strToDecimal(reservesOnBuyDex[0].toString(), decimalsFor)
-//    let arbForReservesOnSellDex = strToDecimal(reservesOnSellDex[0].toString(), decimalsFor)
     let arbAgainstReservesOnBuyDex = strToDecimal(reservesOnBuyDex[1].toString(), decimalsAgainst)
     let arbAgainstReservesOnSellDex = strToDecimal(reservesOnSellDex[1].toString(), decimalsAgainst)
 
@@ -1037,12 +1027,10 @@ const determineProfitability = async (_routerList,
         const token0In = result[0] // ARB_FOR
         const token1In = result[1] // ARB_AGAINST
         
-//        console.log(`Estimated amount of ${_arbForToken.symbol} to buy ${strToDecimal(actualAmountOut, decimalsAgainst)} ${_arbAgainstToken.symbol} on ${exchangeToBuy}\t\t| ${web3.utils.fromWei(token0In, 'ether')}`)
         console.log(`Estimated amount of ${_arbForToken.symbol} to buy ${strToDecimal(actualAmountOut, decimalsAgainst)} ${_arbAgainstToken.symbol} on ${exchangeToBuy}\t\t| ${strToDecimal(token0In, decimalsFor)}`)
 
         result = await _routerPath[1].methods.getAmountsOut(token1In, [_arbAgainstToken.address, _arbForToken.address]).call()
 
-//        console.log(`Estimated amount of ${_arbForToken.symbol} returned after swapping ${_arbAgainstToken.symbol} on ${exchangeToSell}\t| ${web3.utils.fromWei(result[1], 'ether')}\n`)
         console.log(`Estimated amount of ${_arbForToken.symbol} returned after swapping ${_arbAgainstToken.symbol} on ${exchangeToSell}\t| ${strToDecimal(result[1], decimalsFor)}\n`)
 
         const { amountIn, amountOut } = await getEstimatedReturn(token0In, _routerPath, _arbForToken, _arbAgainstToken)
@@ -1051,31 +1039,18 @@ const determineProfitability = async (_routerList,
         ethBalanceBefore = web3.utils.fromWei(ethBalanceBefore, 'ether')
         const ethBalanceAfter = ethBalanceBefore - estimatedGasCost
 
-//        const amountDifference = amountOut - amountIn
-//        let wethBalanceBefore = await _arbForTokenContract.methods.balanceOf(account).call()
-//        wethBalanceBefore = web3.utils.fromWei(wethBalanceBefore, 'ether')
         const amountDifference = amountOut - amountIn
         let arbForBalanceBefore = await _arbForTokenContract.methods.balanceOf(account).call()
         arbForBalanceBefore = strToDecimal(arbForBalanceBefore, decimalsFor)
 
-//        const wethBalanceAfter = amountDifference + Number(wethBalanceBefore)
-//        const wethBalanceDifference = wethBalanceAfter - Number(wethBalanceBefore)
         const arbForBalanceAfter = amountDifference + Number(arbForBalanceBefore)
         const arbForBalanceDifference = arbForBalanceAfter - Number(arbForBalanceBefore)
 
-//        const totalGained = wethBalanceDifference - Number(estimatedGasCost)
         const totalGained = arbForBalanceDifference - gasCostInArbFor
 
         console.log(`    ArbFor = ${_arbForToken.symbol}`)
 
         const data = {
-//            'ETH Balance Before': ethBalanceBefore,
-//            'ETH Balance After': ethBalanceAfter,
-//            'ETH Spent (gas)': estimatedGasCost,
-//            '-': {},
-//            'ArbFor Balance BEFORE': wethBalanceBefore,
-//            'ArbFor Balance AFTER': wethBalanceAfter,
-//            'ArbFor Gained/Lost': wethBalanceDifference,
             'ETH Balance Before': ethBalanceBefore,
             'ETH Balance After': ethBalanceAfter,
             'ETH Spent (gas)': estimatedGasCost,
@@ -1204,11 +1179,6 @@ const executeTrade = async (_routerList,
         'ETH Spent (gas)': web3.utils.fromWei((ethBalanceBefore - ethBalanceAfter).toString(), 'ether'),
         'Gas cost in ArbFor': gasCostInArbFor,
         '-': {},
-//        'ArbFor Balance BEFORE': web3.utils.fromWei(balanceBefore.toString(), 'ether'),
-//        'ArbFor Balance AFTER': web3.utils.fromWei(balanceAfter.toString(), 'ether'),
-//        'ArbFor Gained/Lost': web3.utils.fromWei(balanceDifference.toString(), 'ether'),
-//        '-': {},
-//        'Total Gained/Lost': `${web3.utils.fromWei((balanceDifference - totalSpent).toString(), 'ether')} ETH`
         'ArbFor Balance BEFORE': strToDecimal(balanceBefore.toString(), decimalsFor),
         'ArbFor Balance AFTER': strToDecimal(balanceAfter.toString(), decimalsFor),
         'ArbFor Gained/Lost': strToDecimal(arbForBalanceDifference.toString(), decimalsFor),
