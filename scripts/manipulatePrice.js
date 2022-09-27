@@ -6,9 +6,6 @@
 // -----------------------------------------------------------------------------------------------
 
 // -- IMPORT PACKAGES -- //
-// Include process module
-//const process = require('process');
-//import { argv } from 'node:process';
 require("dotenv").config();
 
 const Web3 = require('web3')
@@ -152,7 +149,7 @@ const main = async () => {
     const tokenFor = new Token(
         ChainId.MAINNET,
         ARB_FOR_ADDRESS,
-        18,
+        await ARB_FOR_CONTRACT.methods.decimals().call(),
         await ARB_FOR_CONTRACT.methods.symbol().call(),
         await ARB_FOR_CONTRACT.methods.name().call()
     )
@@ -160,20 +157,31 @@ const main = async () => {
     const tokenAgainst = new Token(
         ChainId.MAINNET,
         ARB_AGAINST_ADDRESS,
-        18,
+        await ARB_AGAINST_CONTRACT.methods.decimals().call(),
         await ARB_AGAINST_CONTRACT.methods.symbol().call(),
         await ARB_AGAINST_CONTRACT.methods.name().call()
     )
 
+    const decimalsFor = tokenFor.decimals
+    const decimalsAgainst = tokenAgainst.decimals
+
     // Fetch price of token pair before we execute the swap
     console.log('fetching priceBefore\n')
-    const priceBefore = await calculatePrice(pairContract)
+    const priceBefore = await calculatePrice(pairContract,
+                                            decimalsFor,
+                                            decimalsAgainst,
+                                            tokenFor,
+                                            tokenAgainst)
     console.log('calling manipulatePrice\n')
     await manipulatePrice(tokenFor, tokenAgainst, account)
 
     // Fetch price of token pair after the swap
     console.log('fetching priceAfter\n')
-    const priceAfter = await calculatePrice(pairContract)
+    const priceAfter = await calculatePrice(pairContract,
+                                            decimalsFor,
+                                            decimalsAgainst,
+                                            tokenFor,
+                                            tokenAgainst)
 
     const data = {
         'Price Before': `1 ${tokenFor.symbol} = ${Number(priceBefore).toFixed(0)} ${tokenAgainst.symbol}`,
