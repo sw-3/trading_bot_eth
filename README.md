@@ -1,17 +1,19 @@
 # Trading Bot Demo
 
-As a starting point, I used the demo trading bot from Dapp University. My main purpose was to learn more about Blockchain app development. The original bot was limited to monitoring 1 pair (SHIB-WETH) on Uniswap and SushiSwap.  The manipulatePrice.js script was provided to force an arbitrage situation in that one pair, using ganache as a test environment.
+As a starting point, I used the demo trading bot from Dapp University. 
+The original bot was limited to monitoring 1 pair (SHIB-WETH) on Uniswap and SushiSwap.
 
-## Enhancements
-This enhanced version of the arbitrage bot has several new features I added.
+## Enhancements and Fixes
+This enhanced version of the arbitrage bot has several new features/fixes I added.
 - Allows monitoring 3 Dex's simultaneously (Uniswap, SushiSwap, and ShibaSwap)
 - Allows monitoring up to 5 token pairs simultaneously
 - Added summary statistics displayed over time, to provide information on attempted pairs/Dex's
+- Made it generally easier to configure and try more pairs
+- Fixed the errors that occurred when the reserve amounts were not large enough for the trade
+- Fixed calculation errors with tokens that have different decimal places than ETH
 
 ## Technology Stack & Tools
-
-I developed this project on Pop! OS (a fork of Ubuntu). I do not know how well it will work on Windows or Mac.
-
+- Developed on Pop! OS (a fork of Ubuntu).
 - Solidity (Writing Smart Contract)
 - Javascript (React & Testing)
 - [Web3](https://web3js.readthedocs.io/en/v1.5.2/) (Blockchain Interaction)
