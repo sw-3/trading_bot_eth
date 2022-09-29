@@ -23,9 +23,7 @@ const {
 
 // get the initialized Exchange/Token/Contract/Stats info
 const { 
-    factories,
-    routers,
-    exchangeNames,
+    factories, routers, exchangeNames,
     web3, arbitrage,
     exchangesActive, pairsActive,
     ARBFORaddr, arbAgainstAddresses,
@@ -63,10 +61,44 @@ for (let eID = 0; eID < maxExchanges; eID++) {
     }
 }
 
+var researchRun = false
 
 // -- MAIN PROGRAM -- //
 
 const main = async () => {
+    var args = process.argv;
+    var progname, cliOpt1
+
+    args.forEach((val, index) => {
+        if (index == 1) {
+            progname = val
+        }
+        else if (index == 2) {
+            cliOpt1 = val
+        }
+    });
+
+    var usageExit = false
+
+    if (cliOpt1 != null) {
+        if (cliOpt1 === "--research") {
+            researchRun = true
+            console.log("")
+            console.log(`Beginning Research Mode Run...\n`)
+        } else if (cliOpt1 === "--help") {
+            usageExit = true
+        } else {
+            console.log("Unrecognized command line option.")
+            usageExit = true
+        }
+    }
+    if (usageExit) {
+        console.log("")
+        console.log(`usage:  node ${progname} [--help] [--research]\n`)
+        console.log(`where:  --help     = this usage message`)
+        console.log(`        --research = output pool and reserve info for configured pairs and exit\n\n`)
+        process.exit(usageExit)
+    }
 
     var arbForToken
     var arbForTokenContract
@@ -131,6 +163,9 @@ const main = async () => {
     // fill allPairs[] with the DEX contracts for each token-pair
     // IF the exchange is not active, fill it's pair contracts with 'null'
     // If a pair is not active, fill it's contract with 'null' in all
+    if (researchRun) {
+        console.log(`Looking for configured exchanges and pairs...\n`)
+    }
     var exitValue = 0
     var exchPair
     for (let eID = 0; eID < maxExchanges; eID++) {
@@ -167,6 +202,63 @@ const main = async () => {
     // Exit gracefully, if any of the pairs were not found
     if (exitValue == -3) { process.exit(-3) }
 
+    /* -------------  RESEARCH MODE STUFF  ----------------------------------------
+    -------------------------------------------------------------------------------*/
+    if (researchRun) {
+        var exchangeReserves = []
+        // get the data
+        for (let eID = 0; eID < maxExchanges; eID++) {
+            exchangeReserves[eID] = []
+            if (exchangesActive[eID]) {
+
+                for (let pID = 0; pID < maxPairs; pID++) {
+                    exchangeReserves[eID][pID] = [0, 0]
+                    if (pairsActive[pID]) {
+                        // get current price for the pairs on each exchange
+                        exchangePrices[eID].prices[pID] = await calculatePrice(allPairs[eID][pID],
+                                                                    arbForToken.decimals,
+                                                                    arbAgainstTokens[pID].decimals,
+                                                                    arbForToken,
+                                                                    arbAgainstTokens[pID])
+                        // get reserves for the pairs on each exchange
+                        exchangeReserves[eID][pID] = await getReserves(allPairs[eID][pID],
+                                                                        arbForToken,
+                                                                        arbAgainstTokens[pID])
+                    }
+                }
+            }
+        }
+        // output the data
+        console.log(`--------------------------------------------------------------------------------------------------------`)
+        console.log(`--------------------------           Research on Token Pair Pools           ----------------------------`)
+        console.log(`--------------------------------------------------------------------------------------------------------\n`)
+
+        for (let pID = 0; pID < maxPairs; pID++) {
+            if (pairsActive[pID]) {
+                console.log(`--------   ${arbForToken.symbol.padEnd(5)}/ ${arbAgainstTokens[pID].symbol.padEnd(5)} Pools   ` +
+                            `------------------------------------------------------------------------`)
+                for (let eID = 0; eID < maxExchanges; eID++) {
+                    if (exchangesActive[eID]) {
+                        const fmtPrice = Number(exchangePrices[eID].prices[pID]).toFixed(4)
+                        const fmtRes1 = Number(strToDecimal(exchangeReserves[eID][pID][0],
+                                                            arbForToken.decimals)).toFixed(4)
+                        const fmtRes2 = Number(strToDecimal(exchangeReserves[eID][pID][1],
+                                                            arbAgainstTokens[pID].decimals)).toFixed(4)
+                        console.log(`   ${exchangeNames[eID].padEnd(15)}:  ` +
+                                    `price for 1 ${arbForToken.symbol} = ${fmtPrice}   ` +
+                                    `reserves = ${fmtRes1} ${arbForToken.symbol} ` +
+                                    `| ${fmtRes2} ${arbAgainstTokens[pID].symbol}]`)
+                    }
+                }
+                console.log(``)
+            }
+        }
+        console.log(``)
+
+        // done with research mode, exit
+        process.exit()
+    }
+
     // Execute a 1-time sweep of the pair prices after start-up
     var receipt
     if (!isExecuting) {
@@ -192,6 +284,9 @@ const main = async () => {
         isExecuting = false
     }
 
+    /*-------------  Output a summary of the Pair Contracts we will monitor  ----------------
+     ----------------------------------------------------------------------------------------*/
+
     console.log(`------------------------------------------------------------------`)
     console.log(`--------   Token Pair Contracts to Monitor                --------`)
     console.log(`------------------------------------------------------------------\n`)
@@ -209,7 +304,8 @@ const main = async () => {
     }
     console.log(``)
 
-    // --  Set up the Swap Event Handlers  -- //
+    /*-------------  Set up the Swap Event Handlers  ----------------------------------------
+     ----------------------------------------------------------------------------------------*/
     for (let eID = 0; eID < maxExchanges; eID++) {
         if (exchangesActive[eID]) {
             // exchange is active; set up event handler for active pairs
@@ -222,6 +318,8 @@ const main = async () => {
         }
     }
 
+    /*-------------  Output Run Stats  ------------------------------------------------------
+     ----------------------------------------------------------------------------------------*/
     outputTotalStats(totalStats)
     outputPairStats(pairStats, totalStats, pairsActive)
     outputExchangeStats(exchangeStats, totalStats, exchangesActive)
