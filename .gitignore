@@ -19,6 +19,8 @@
 .env.development.local
 .env.test.local
 .env.production.local
+orig-bot.js
+config.json
 
 npm-debug.log*
 yarn-debug.log*

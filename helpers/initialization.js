@@ -37,19 +37,6 @@ if (!config.PROJECT_SETTINGS.isLocal) {
 const IUniswapV2Router02 = require('@uniswap/v2-periphery/build/IUniswapV2Router02.json')
 const IUniswapV2Factory = require("@uniswap/v2-core/build/IUniswapV2Factory.json")
 
-// load Exchange contracts
-const uFactory = new web3.eth.Contract(IUniswapV2Factory.abi, config.EXCHANGES.UNISWAP.FACTORY_ADDRESS) // UNISWAP FACTORY CONTRACT
-const uRouter = new web3.eth.Contract(IUniswapV2Router02.abi, config.EXCHANGES.UNISWAP.V2_ROUTER_02_ADDRESS) // UNISWAP ROUTER CONTRACT
-const sFactory = new web3.eth.Contract(IUniswapV2Factory.abi, config.EXCHANGES.SUSHISWAP.FACTORY_ADDRESS) // SUSHISWAP FACTORY CONTRACT
-const sRouter = new web3.eth.Contract(IUniswapV2Router02.abi, config.EXCHANGES.SUSHISWAP.V2_ROUTER_02_ADDRESS) // SUSHISWAP ROUTER CONTRACT
-const tFactory = new web3.eth.Contract(IUniswapV2Factory.abi, config.EXCHANGES.SHIBASWAP.FACTORY_ADDRESS) // SHIBASWAP FACTORY CONTRACT
-const tRouter = new web3.eth.Contract(IUniswapV2Router02.abi, config.EXCHANGES.SHIBASWAP.V2_ROUTER_02_ADDRESS) // SHIBASWAP ROUTER CONTRACT
-
-// load Exchange Names
-const uName = config.EXCHANGES.UNISWAP.NAME
-const sName = config.EXCHANGES.SUSHISWAP.NAME
-const tName = config.EXCHANGES.SHIBASWAP.NAME
-
 // load Arbitrage contract
 const IArbitrage = require('../build/contracts/Arbitrage.json')
 const arbitrage = new web3.eth.Contract(IArbitrage.abi, IArbitrage.networks[1].address);
@@ -57,49 +44,52 @@ const arbitrage = new web3.eth.Contract(IArbitrage.abi, IArbitrage.networks[1].a
 // -- CONFIGURE WHICH EXCHANGES & PAIRS ARE MONITORED BY THE BOT -- //
 // ---------------  (defined in config.json file)  ---------------- //
 
-// The 3 exchanges, in order, are Uniswap, Sushiswap, and Shibaswap
-// Set them to true, if using
-const exchangesActive = [false, false, false]
-if (config.EXCHANGES.UNISWAP.MONITOR) { exchangesActive[0] = true }
-if (config.EXCHANGES.SUSHISWAP.MONITOR) { exchangesActive[1] = true }
-if (config.EXCHANGES.SHIBASWAP.MONITOR) { exchangesActive[2] = true }
+const maxPairs = config.PROJECT_SETTINGS.maxPairs
+const maxExchanges = config.PROJECT_SETTINGS.maxExchanges
+
+// Load the exchange information (in order, are Uniswap, Sushiswap, and Shibaswap)
+//var exchanges = []
+var exchangeNames = []
+var factories = []
+var routers = []
+var exchangesActive = []
+var exchange
+
+for (let eID = 0; eID < maxExchanges; eID++) {
+    exchangesActive[eID] = false
+    exchangeNames[eID] = ""
+}
+
+for (let eID = 0; eID < maxExchanges; eID++) {
+    exchange = config.PROJECT_SETTINGS.exchanges[eID]
+    if (exchange != "") {
+        exchangesActive[eID] = config.EXCHANGES[exchange].MONITOR
+        factories[eID] = new web3.eth.Contract(IUniswapV2Factory.abi, config.EXCHANGES[exchange].FACTORY_ADDRESS)
+        routers[eID] = new web3.eth.Contract(IUniswapV2Router02.abi, config.EXCHANGES[exchange].V2_ROUTER_02_ADDRESS)
+        exchangeNames[eID] = config.EXCHANGES[exchange].NAME
+    }
+}
 
 // load the base token to be used in each pair (defined in config.json)
 const ARBFORTOKEN = config.PROJECT_SETTINGS.baseToken
 const ARBFORaddr = config.TOKENS[ARBFORTOKEN].address
 
-// load the 5 tokens to pair with the base token (defined in config.json)
-let PAIR1addr="", PAIR2addr="", PAIR3addr="", PAIR4addr="", PAIR5addr=""
-const pairsActive = [false, false, false, false, false]
+// load the tokens to pair with the base token (defined in config.json)
+var arbAgainstAddresses = []
+var pairsActive = []
+var token
 
-const PAIR1TOKEN = config.PROJECT_SETTINGS.pairTokens[0]
-if (PAIR1TOKEN != "") {
-    PAIR1addr = config.TOKENS[PAIR1TOKEN].address
-    pairsActive[0] = true
+for (let pID = 0; pID < maxPairs; pID++) {
+    arbAgainstAddresses[pID] = ""
+    pairsActive[pID] = false
 }
 
-const PAIR2TOKEN = config.PROJECT_SETTINGS.pairTokens[1]
-if (PAIR2TOKEN != "") {
-    PAIR2addr = config.TOKENS[PAIR2TOKEN].address
-    pairsActive[1] = true
-}
-
-const PAIR3TOKEN = config.PROJECT_SETTINGS.pairTokens[2]
-if (PAIR3TOKEN != "") {
-    PAIR3addr = config.TOKENS[PAIR3TOKEN].address
-    pairsActive[2] = true
-}
-
-const PAIR4TOKEN = config.PROJECT_SETTINGS.pairTokens[3]
-if (PAIR4TOKEN != "") {
-    PAIR4addr = config.TOKENS[PAIR4TOKEN].address
-    pairsActive[3] = true
-}
-
-const PAIR5TOKEN = config.PROJECT_SETTINGS.pairTokens[4]
-if (PAIR5TOKEN != "") {
-    PAIR5addr = config.TOKENS[PAIR5TOKEN].address
-    pairsActive[4] = true
+for (let pID = 0; pID < maxPairs; pID++) {
+    token = config.PROJECT_SETTINGS.pairTokens[pID]
+    if (token != "") {
+        arbAgainstAddresses[pID] = config.TOKENS[token].address
+        pairsActive[pID] = true
+    }
 }
 
 // -- INITIALIZE STATS TRACKING VARIABLES -- //
@@ -299,25 +289,17 @@ var exchangeStats = [
 ]
 
 module.exports = {
-    uFactory,
-    uRouter,
-    uName,
-    sFactory,
-    sRouter,
-    sName,
-    tFactory,
-    tRouter,
-    tName,
+    factories,
+    routers,
+    exchangeNames,
     web3,
     arbitrage,
     exchangesActive,
     pairsActive,
     ARBFORaddr,
-    PAIR1addr,
-    PAIR2addr,
-    PAIR3addr,
-    PAIR4addr,
-    PAIR5addr,
+    arbAgainstAddresses,
+    maxPairs,
+    maxExchanges,
     totalStats,
     pairStats,
     exchangeStats

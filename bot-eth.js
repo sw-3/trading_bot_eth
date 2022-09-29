@@ -23,12 +23,13 @@ const {
 
 // get the initialized Exchange/Token/Contract/Stats info
 const { 
-    uFactory, uRouter, uName,
-    sFactory, sRouter, sName,
-    tFactory, tRouter, tName,
-    web3, arbitrage, 
+    factories,
+    routers,
+    exchangeNames,
+    web3, arbitrage,
     exchangesActive, pairsActive,
-    ARBFORaddr, PAIR1addr, PAIR2addr, PAIR3addr, PAIR4addr, PAIR5addr
+    ARBFORaddr, arbAgainstAddresses,
+    maxPairs, maxExchanges
 } = require('./helpers/initialization')
 
 // get the initialized statistics variables
@@ -50,26 +51,47 @@ let isExecuting = false
 let isInitialCheck = false
 let timeOfLastStatus = moment()     // to allow auto-output of status every 5 minutes
 
-// store the latest known price per pair per exchange
-// the array index (0, 1, 2) corresponds to the exchangeID
-let exchangePrices = [
-    {
-        name: uName,                // 1st exchange name
-        prices: [0, 0, 0, 0, 0]     // array index corresponds to pairID
-    },
-    {
-        name: sName,        // 2nd exchnage name
-        prices: [0, 0, 0, 0, 0]
-    },
-    {
-        name: tName,        // 3rd exchange name
-        prices: [0, 0, 0, 0, 0]
+// exchangePrices will store the price of each token-pair on each exchange
+var exchangePrices = []
+for (let eID = 0; eID < maxExchanges; eID++) {
+    exchangePrices[eID] = {
+        name: exchangeNames[eID],
+        prices: []
     }
-]
+    for (let pID = 0; pID < maxPairs; pID++) {
+        exchangePrices[eID].prices[pID] = 0
+    }
+}
+
 
 // -- MAIN PROGRAM -- //
 
 const main = async () => {
+
+    var arbForToken
+    var arbForTokenContract
+    var allPairs = []
+    var arbAgainstTokens = []
+    var arbAgainstTokenContracts = []
+
+    // Swap event handler function
+    const swapEventHandler = async (_exchID, _pairID) => {
+    console.log(`event handler called!  eID = ${_exchID}, pID = ${_pairID}`)
+        if (!isExecuting) {
+            isExecuting = true
+
+            // process this event
+            receipt = await processTradeEvent(exchangeNames, _exchID, _pairID,
+                                                arbForToken,
+                                                arbForTokenContract,
+                                                arbAgainstTokens[_pairID],
+                                                arbAgainstTokenContracts[_pairID],
+                                                allPairs)
+
+            isExecuting = false
+        }
+    }
+
     // record startTime for stats
     totalStats.startTime = moment()    // current time as moment object
 
@@ -94,178 +116,56 @@ const main = async () => {
 
     // get all token information from the blockchain
     var tokenAndContract = await getTokenAndContract(ARBFORaddr)
-    const arbForToken = tokenAndContract.token
-    const arbForTokenContract = tokenAndContract.tokenContract
+    arbForToken = tokenAndContract.token
+    arbForTokenContract = tokenAndContract.tokenContract
 
-    tokenAndContract = await getTokenAndContract(PAIR1addr)
-    const arbAgainstToken1 = tokenAndContract.token
-    const arbAgainstToken1Contract = tokenAndContract.tokenContract
-    pairStats[0].symbol = arbAgainstToken1.symbol
-
-    tokenAndContract = await getTokenAndContract(PAIR2addr)
-    const arbAgainstToken2 = tokenAndContract.token
-    const arbAgainstToken2Contract = tokenAndContract.tokenContract
-    pairStats[1].symbol = arbAgainstToken2.symbol
-
-    tokenAndContract = await getTokenAndContract(PAIR3addr)
-    const arbAgainstToken3 = tokenAndContract.token
-    const arbAgainstToken3Contract = tokenAndContract.tokenContract
-    pairStats[2].symbol = arbAgainstToken3.symbol
-
-    tokenAndContract = await getTokenAndContract(PAIR4addr)
-    const arbAgainstToken4 = tokenAndContract.token
-    const arbAgainstToken4Contract = tokenAndContract.tokenContract
-    pairStats[3].symbol = arbAgainstToken4.symbol
-
-    tokenAndContract = await getTokenAndContract(PAIR5addr)
-    const arbAgainstToken5 = tokenAndContract.token
-    const arbAgainstToken5Contract = tokenAndContract.tokenContract
-    pairStats[4].symbol = arbAgainstToken5.symbol
-
-
-    // get the Uniswap contracts for each token-pair
-    let uPair1, uPair2, uPair3, uPair4, uPair5
-    if (exchangesActive[0]) {
-        uPair1 = await getPairContract(uFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken1.address)
-        if (uPair1 === null) {
-            console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken1.symbol} on Uniswap.`)
-            process.exit(-3)
-        }
-        if (pairsActive[1]) {
-            uPair2 = await getPairContract(uFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken2.address)
-            if (uPair2 === null) {
-                console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken2.symbol} on Uniswap.`)
-                process.exit(-3)
-            }
-        }
-        if (pairsActive[2]) {
-            uPair3 = await getPairContract(uFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken3.address)
-            if (uPair3 === null) {
-                console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken3.symbol} on Uniswap.`)
-                process.exit(-3)
-            }
-        }
-        if (pairsActive[3]) {
-            uPair4 = await getPairContract(uFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken4.address)
-            if (uPair4 === null) {
-                console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken4.symbol} on Uniswap.`)
-                process.exit(-3)
-            }
-        }
-        if (pairsActive[4]) {
-            uPair5 = await getPairContract(uFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken5.address)
-            if (uPair5 === null) {
-                console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken5.symbol} on Uniswap.`)
-                process.exit(-3)
-            }
+    for (let pID = 0; pID < maxPairs; pID++) {
+        if (pairsActive[pID]) {
+            tokenAndContract = await getTokenAndContract(arbAgainstAddresses[pID])
+            arbAgainstTokens[pID] = tokenAndContract.token
+            arbAgainstTokenContracts[pID] = tokenAndContract.tokenContract
+            pairStats[pID].symbol = arbAgainstTokens[pID].symbol
         }
     }
 
-    // get the SushiSwap contracts for each token-pair
-    let sPair1, sPair2, sPair3, sPair4, sPair5
-    if (exchangesActive[1]) {
-        sPair1 = await getPairContract(sFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken1.address)
-        if (sPair1 === null) {
-            console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken1.symbol} on SushiSwap.`)
-            process.exit(-3)
-        }
-        if (pairsActive[1]) {
-            sPair2 = await getPairContract(sFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken2.address)
-            if (sPair2 === null) {
-                console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken2.symbol} on SushiSwap.`)
-                process.exit(-3)
+    // fill allPairs[] with the DEX contracts for each token-pair
+    // IF the exchange is not active, fill it's pair contracts with 'null'
+    // If a pair is not active, fill it's contract with 'null' in all
+    var exitValue = 0
+    var exchPair
+    for (let eID = 0; eID < maxExchanges; eID++) {
+        // for each exchange ...
+        allPairs[eID] = []
+        for (let pID = 0; pID < maxPairs; pID++) {
+            // for each pair ...
+            if (exchangesActive[eID]) {
+                // if the exchange is active ...
+                if (pairsActive[pID]) {
+                    // AND if the pair is active ... get the contract
+                    exchPair = await getPairContract(factories[eID], 
+                                                            arbForToken.address, 
+                                                            arbAgainstTokens[pID].address)
+                    if (exchPair === null) {
+                        console.log(`ERROR: did not find` +
+                                    ` ${arbForToken.symbol}/${arbAgainstTokens[pID].symbol}` +
+                                    ` on ${exchangeNames[eID]}.`)
+                        exitValue = -3
+                    }
+                } else {
+                    // if the exch is active, but not the pair, set this contract to null
+                    exchPair = null
+                }
             }
-        }
-        if (pairsActive[2]) {
-            sPair3 = await getPairContract(sFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken3.address)
-            if (sPair3 === null) {
-                console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken3.symbol} on SushiSwap.`)
-                process.exit(-3)
+            else {
+                // if the exchange is not active, set this contract to null
+                exchPair = null
             }
-        }
-        if (pairsActive[3]) {
-            sPair4 = await getPairContract(sFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken4.address)
-            if (sPair4 === null) {
-                console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken4.symbol} on SushiSwap.`)
-                process.exit(-3)
-            }
-        }
-        if (pairsActive[4]) {
-            sPair5 = await getPairContract(sFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken5.address)
-            if (sPair5 === null) {
-                console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken5.symbol} on SushiSwap.`)
-                process.exit(-3)
-            }
+            allPairs[eID][pID] = exchPair
         }
     }
 
-    // get the ShibaSwap contracts for each token-pair
-    let tPair1, tPair2, tPair3, tPair4, tPair5
-    if (exchangesActive[2]) {
-        tPair1 = await getPairContract(tFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken1.address)
-        if (tPair1 === null) {
-            console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken1.symbol} on ShibaSwap.`)
-            process.exit(-3)
-        }
-        if (pairsActive[1]) {
-            tPair2 = await getPairContract(tFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken2.address)
-            if (tPair2 === null) {
-                console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken2.symbol} on ShibaSwap.`)
-                process.exit(-3)
-            }
-        }
-        if (pairsActive[2]) {
-            tPair3 = await getPairContract(tFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken3.address)
-            if (tPair3 === null) {
-                console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken3.symbol} on ShibaSwap.`)
-                process.exit(-3)
-            }
-        }
-        if (pairsActive[3]) {
-            tPair4 = await getPairContract(tFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken4.address)
-            if (tPair4 === null) {
-                console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken4.symbol} on ShibaSwap.`)
-                process.exit(-3)
-            }
-        }
-        if (pairsActive[4]) {
-            tPair5 = await getPairContract(tFactory, 
-                                    arbForToken.address, 
-                                    arbAgainstToken5.address)
-            if (tPair5 === null) {
-                console.log(`ERROR: did not find ${arbForToken.symbol}/${arbAgainstToken5.symbol} on ShibaSwap.`)
-                process.exit(-3)
-            }
-        }
-    }
+    // Exit gracefully, if any of the pairs were not found
+    if (exitValue == -3) { process.exit(-3) }
 
     // Execute a 1-time sweep of the pair prices after start-up
     var receipt
@@ -276,65 +176,18 @@ const main = async () => {
         else if (exchangesActive[1])    { exchangeID = 1 }      // SushiSwap
         else if (exchangesActive[2])    { exchangeID = 2 }      // ShibaSwap
 
-        console.log(`\nInitial price check for ${arbForToken.symbol}/${arbAgainstToken1.symbol}...\n`)
-
-        // Check first pair, as if a trade just happened
-        pairID = 0
-        receipt = await processTradeEvent(uName, exchangeID, pairID,
-                                            arbForToken,
-                                            arbForTokenContract,
-                                            arbAgainstToken1,
-                                            arbAgainstToken1Contract,
-                                            uPair1, sPair1, tPair1)
-
-        if (pairsActive[1]) {
-            console.log(`\nInitial price check for ${arbForToken.symbol}/${arbAgainstToken2.symbol}...\n`)
-
-            // Check 2nd pair, as if a trade just happened
-            pairID = 1
-            receipt = await processTradeEvent(uName, exchangeID, pairID,
-                                                arbForToken, 
-                                                arbForTokenContract,
-                                                arbAgainstToken2,
-                                                arbAgainstToken2Contract,
-                                                uPair2, sPair2, tPair2)
+        for (let pID = 0; pID < maxPairs; pID++) {
+            if (pairsActive[pID]) {
+                console.log(`\nInitial price check for ${arbForToken.symbol}/${arbAgainstTokens[pID].symbol}...\n`)
+                receipt = await processTradeEvent(exchangeNames, exchangeID, pID,
+                                                    arbForToken,
+                                                    arbForTokenContract,
+                                                    arbAgainstTokens[pID],
+                                                    arbAgainstTokenContracts[pID],
+                                                    allPairs)
+            }
         }
-        if (pairsActive[2]) {
-            console.log(`\nInitial price check for ${arbForToken.symbol}/${arbAgainstToken3.symbol}...\n`)
 
-            // Check 3rd pair, as if a trade just happened
-            pairID = 2
-            receipt = await processTradeEvent(uName, exchangeID, pairID,
-                                                arbForToken, 
-                                                arbForTokenContract,
-                                                arbAgainstToken3,
-                                                arbAgainstToken3Contract,
-                                                uPair3, sPair3, tPair3)
-        }
-        if (pairsActive[3]) {
-            console.log(`\nInitial price check for ${arbForToken.symbol}/${arbAgainstToken4.symbol}...\n`)
-
-            // Check 4th pair, as if a trade just happened
-            pairID = 3
-            receipt = await processTradeEvent(uName, exchangeID, pairID,
-                                                arbForToken, 
-                                                arbForTokenContract,
-                                                arbAgainstToken4,
-                                                arbAgainstToken4Contract,
-                                                uPair4, sPair4, tPair4)
-        }
-        if (pairsActive[4]) {
-            console.log(`\nInitial price check for ${arbForToken.symbol}/${arbAgainstToken5.symbol}...\n`)
-
-            // Check 5th pair, as if a trade just happened
-            pairID = 4
-            receipt = await processTradeEvent(uName, exchangeID, pairID,
-                                                arbForToken, 
-                                                arbForTokenContract,
-                                                arbAgainstToken5,
-                                                arbAgainstToken5Contract,
-                                                uPair5, sPair5, tPair5)
-        }
         isInitialCheck = false
         isExecuting = false
     }
@@ -342,385 +195,30 @@ const main = async () => {
     console.log(`------------------------------------------------------------------`)
     console.log(`--------   Token Pair Contracts to Monitor                --------`)
     console.log(`------------------------------------------------------------------\n`)
-    console.log(`--------   ${arbForToken.symbol}/${arbAgainstToken1.symbol}    ------------------------------------------`)
-    if (exchangesActive[0]) {console.log(`   ${uName} contract:    ${uPair1.options.address}`)}
-    if (exchangesActive[1]) {console.log(`   ${sName} contract:  ${sPair1.options.address}`)}
-    if (exchangesActive[2]) {console.log(`   ${tName} contract:  ${tPair1.options.address}`)}
+
+    for (let pID = 0; pID < maxPairs; pID++) {
+        if (pairsActive[pID]) {
+            console.log(`--------   ${arbForToken.symbol}/${arbAgainstTokens[pID].symbol}    ------------------------------------------`)
+            for (let eID = 0; eID < maxExchanges; eID++) {
+                if (exchangesActive[eID]) {
+                    console.log(`   ${exchangeNames[eID]} contract:    ${allPairs[eID][pID].options.address}`)
+                }
+            }
+            console.log(``)
+        }
+    }
     console.log(``)
 
-    if (pairsActive[1]) {
-        console.log(`--------   ${arbForToken.symbol}/${arbAgainstToken2.symbol}    ------------------------------------------`)
-        if (exchangesActive[0]) {console.log(`   ${uName} contract:    ${uPair2.options.address}`)}
-        if (exchangesActive[1]) {console.log(`   ${sName} contract:  ${sPair2.options.address}`)}
-        if (exchangesActive[2]) {console.log(`   ${tName} contract:  ${tPair2.options.address}`)}
-        console.log(``)
-    }
-    if (pairsActive[2]) {
-        console.log(`--------   ${arbForToken.symbol}/${arbAgainstToken3.symbol}    ------------------------------------------`)
-        if (exchangesActive[0]) {console.log(`   ${uName} contract:    ${uPair3.options.address}`)}
-        if (exchangesActive[1]) {console.log(`   ${sName} contract:  ${sPair3.options.address}`)}
-        if (exchangesActive[2]) {console.log(`   ${tName} contract:  ${tPair3.options.address}`)}
-        console.log(``)
-    }
-    if (pairsActive[3]) {
-        console.log(`--------   ${arbForToken.symbol}/${arbAgainstToken4.symbol}    ------------------------------------------`)
-        if (exchangesActive[0]) {console.log(`   ${uName} contract:    ${uPair4.options.address}`)}
-        if (exchangesActive[1]) {console.log(`   ${sName} contract:  ${sPair4.options.address}`)}
-        if (exchangesActive[2]) {console.log(`   ${tName} contract:  ${tPair4.options.address}`)}
-        console.log(``)
-    }
-    if (pairsActive[4]) {
-        console.log(`--------   ${arbForToken.symbol}/${arbAgainstToken5.symbol}    ------------------------------------------`)
-        if (exchangesActive[0]) {console.log(`   ${uName} contract:    ${uPair5.options.address}`)}
-        if (exchangesActive[1]) {console.log(`   ${sName} contract:  ${sPair5.options.address}`)}
-        if (exchangesActive[2]) {console.log(`   ${tName} contract:  ${tPair5.options.address}`)}
-        console.log(`\n`)
-    }
-
-    if (exchangesActive[0]) {
-        // Execute this code if the 1st exchange processes a trade of our pair1
-        uPair1.events.Swap({}, async () => {
-
-            exchangeID = 0
-            pairID = 0
-
-            if (!isExecuting) {
-                isExecuting = true
-
-                // process this event
-                receipt = await processTradeEvent(uName, exchangeID, pairID,
-                                                    arbForToken,
-                                                    arbForTokenContract,
-                                                    arbAgainstToken1,
-                                                    arbAgainstToken1Contract,
-                                                    uPair1, sPair1, tPair1)
-
-                isExecuting = false
+    // --  Set up the Swap Event Handlers  -- //
+    for (let eID = 0; eID < maxExchanges; eID++) {
+        if (exchangesActive[eID]) {
+            // exchange is active; set up event handler for active pairs
+            for (let pID = 0; pID < maxPairs; pID++) {
+                if (pairsActive[pID]) {
+                    // pair is active
+                    allPairs[eID][pID].events.Swap({}, async () => { swapEventHandler(eID, pID) })
+                }
             }
-        })
-    }
-
-    if (exchangesActive[1]) {
-        // execute this code if the 2nd exchange processes a trade of our pair1
-        sPair1.events.Swap({}, async () => {
-
-            exchangeID = 1
-            pairID = 0
-
-            if (!isExecuting) {
-                isExecuting = true
-
-                // process this event
-                receipt = await processTradeEvent(sName, exchangeID, pairID,
-                                                    arbForToken, 
-                                                    arbForTokenContract,
-                                                    arbAgainstToken1,
-                                                    arbAgainstToken1Contract,
-                                                    uPair1, sPair1, tPair1)
-               
-                isExecuting = false
-            }
-        })
-    }
-
-    if (exchangesActive[2]) {
-        // execute this code if the 3rd exchange processes a trade of our pair1
-        tPair1.events.Swap({}, async () => {
-
-            exchangeID = 2
-            pairID = 0
-
-            if (!isExecuting) {
-                isExecuting = true
-
-                // process this event
-                receipt = await processTradeEvent(tName, exchangeID, pairID,
-                                                    arbForToken, 
-                                                    arbForTokenContract,
-                                                    arbAgainstToken1,
-                                                    arbAgainstToken1Contract,
-                                                    uPair1, sPair1, tPair1)
-               
-                isExecuting = false
-            }
-        })
-    }
-
-    if (pairsActive[1]) {
-        if (exchangesActive[0]) {
-            // Execute this code if the 1st exchange processes a trade of our pair2
-            uPair2.events.Swap({}, async () => {
-
-                exchangeID = 0
-                pairID = 1
-
-                if (!isExecuting) {
-                    isExecuting = true
-
-                    // process this event
-                    receipt = await processTradeEvent(uName, exchangeID, pairID,
-                                                        arbForToken, 
-                                                        arbForTokenContract,
-                                                        arbAgainstToken2,
-                                                        arbAgainstToken2Contract,
-                                                        uPair2, sPair2, tPair2)
-
-                    isExecuting = false
-                }
-            })
-        }
-        if (exchangesActive[1]) {
-            // execute this code if the 2nd exchange processes a trade of our pair2
-            sPair2.events.Swap({}, async () => {
-
-                exchangeID = 1
-                pairID = 1
-
-                if (!isExecuting) {
-                    isExecuting = true
-
-                    // process this event
-                    receipt = await processTradeEvent(sName, exchangeID, pairID,
-                                                        arbForToken, 
-                                                        arbForTokenContract,
-                                                        arbAgainstToken2,
-                                                        arbAgainstToken2Contract,
-                                                        uPair2, sPair2, tPair2)
-                   
-                    isExecuting = false
-                }
-            })
-        }
-        if (exchangesActive[2]) {
-            // execute this code if the 3rd exchange processes a trade of our pair2
-            tPair2.events.Swap({}, async () => {
-
-                exchangeID = 2
-                pairID = 1
-
-                if (!isExecuting) {
-                    isExecuting = true
-
-                    // process this event
-                    receipt = await processTradeEvent(tName, exchangeID, pairID,
-                                                        arbForToken, 
-                                                        arbForTokenContract,
-                                                        arbAgainstToken2,
-                                                        arbAgainstToken2Contract,
-                                                        uPair2, sPair2, tPair2)
-                   
-                    isExecuting = false
-                }
-            })
-        }
-    }
-
-    if (pairsActive[2]) {
-        if (exchangesActive[0]) {
-            // Execute this code if the 1st exchange processes a trade of our pair3
-            uPair3.events.Swap({}, async () => {
-
-                exchangeID = 0
-                pairID = 2
-
-                if (!isExecuting) {
-                    isExecuting = true
-
-                    // process this event
-                    receipt = await processTradeEvent(uName, exchangeID, pairID,
-                                                        arbForToken, 
-                                                        arbForTokenContract,
-                                                        arbAgainstToken3,
-                                                        arbAgainstToken3Contract,
-                                                        uPair3, sPair3, tPair3)
-
-                    isExecuting = false
-                }
-            })
-        }
-
-        if (exchangesActive[1]) {
-            // execute this code if the 2nd exchange processes a trade of our pair3
-            sPair3.events.Swap({}, async () => {
-
-                exchangeID = 1
-                pairID = 2
-
-                if (!isExecuting) {
-                    isExecuting = true
-
-                    // process this event
-                    receipt = await processTradeEvent(sName, exchangeID, pairID,
-                                                        arbForToken, 
-                                                        arbForTokenContract,
-                                                        arbAgainstToken3,
-                                                        arbAgainstToken3Contract,
-                                                        uPair3, sPair3, tPair3)
-                   
-                    isExecuting = false
-                }
-            })
-        }
-
-        if (exchangesActive[2]) {
-            // execute this code if the 3rd exchange processes a trade of our pair3
-            tPair3.events.Swap({}, async () => {
-
-                exchangeID = 2
-                pairID = 2
-
-                if (!isExecuting) {
-                    isExecuting = true
-
-                    // process this event
-                    receipt = await processTradeEvent(tName, exchangeID, pairID,
-                                                        arbForToken, 
-                                                        arbForTokenContract,
-                                                        arbAgainstToken3,
-                                                        arbAgainstToken3Contract,
-                                                        uPair3, sPair3, tPair3)
-                   
-                    isExecuting = false
-                }
-            })
-        }
-    }
-
-    if (pairsActive[3]) {
-        if (exchangesActive[0]) {
-            // Execute this code if the 1st exchange processes a trade of our pair4
-            uPair4.events.Swap({}, async () => {
-
-                exchangeID = 0
-                pairID = 3
-
-                if (!isExecuting) {
-                    isExecuting = true
-
-                    // process this event
-                    receipt = await processTradeEvent(uName, exchangeID, pairID,
-                                                        arbForToken, 
-                                                        arbForTokenContract,
-                                                        arbAgainstToken4,
-                                                        arbAgainstToken4Contract,
-                                                        uPair4, sPair4, tPair4)
-
-                    isExecuting = false
-                }
-            })
-        }
-        if (exchangesActive[1]) {
-            // execute this code if the 2nd exchange processes a trade of our pair4
-            sPair4.events.Swap({}, async () => {
-
-                exchangeID = 1
-                pairID = 3
-
-                if (!isExecuting) {
-                    isExecuting = true
-
-                    // process this event
-                    receipt = await processTradeEvent(sName, exchangeID, pairID,
-                                                        arbForToken, 
-                                                        arbForTokenContract,
-                                                        arbAgainstToken4,
-                                                        arbAgainstToken4Contract,
-                                                        uPair4, sPair4, tPair4)
-                   
-                    isExecuting = false
-                }
-            })
-        }
-        if (exchangesActive[2]) {
-            // execute this code if the 3rd exchange processes a trade of our pair4
-            tPair4.events.Swap({}, async () => {
-
-                exchangeID = 2
-                pairID = 3
-
-                if (!isExecuting) {
-                    isExecuting = true
-
-                    // process this event
-                    receipt = await processTradeEvent(tName, exchangeID, pairID,
-                                                        arbForToken, 
-                                                        arbForTokenContract,
-                                                        arbAgainstToken4,
-                                                        arbAgainstToken4Contract,
-                                                        uPair4, sPair4, tPair4)
-                   
-                    isExecuting = false
-                }
-            })
-        }
-    }
-
-    if (pairsActive[4]) {
-        if (exchangesActive[0]) {
-            // Execute this code if the 1st exchange processes a trade of our pair5
-            uPair5.events.Swap({}, async () => {
-
-                exchangeID = 0
-                pairID = 4
-
-                if (!isExecuting) {
-                    isExecuting = true
-
-                    // process this event
-                    receipt = await processTradeEvent(uName, exchangeID, pairID,
-                                                        arbForToken, 
-                                                        arbForTokenContract,
-                                                        arbAgainstToken5,
-                                                        arbAgainstToken5Contract,
-                                                        uPair5, sPair5, tPair5)
-
-                    isExecuting = false
-                }
-            })
-        }
-        if (exchangesActive[1]) {
-            // execute this code if the 2nd exchange processes a trade of our pair5
-            sPair5.events.Swap({}, async () => {
-
-                exchangeID = 1
-                pairID = 4
-
-                if (!isExecuting) {
-                    isExecuting = true
-
-                    // process this event
-                    receipt = await processTradeEvent(sName, exchangeID, pairID,
-                                                        arbForToken, 
-                                                        arbForTokenContract,
-                                                        arbAgainstToken5,
-                                                        arbAgainstToken5Contract,
-                                                        uPair5, sPair5, tPair5)
-                   
-                    isExecuting = false
-                }
-            })
-        }
-        if (exchangesActive[2]) {
-            // execute this code if the 3rd exchange processes a trade of our pair5
-            tPair5.events.Swap({}, async () => {
-
-                exchangeID = 2
-                pairID = 4
-
-                if (!isExecuting) {
-                    isExecuting = true
-
-                    // process this event
-                    receipt = await processTradeEvent(tName, exchangeID, pairID,
-                                                        arbForToken, 
-                                                        arbForTokenContract,
-                                                        arbAgainstToken5,
-                                                        arbAgainstToken5Contract,
-                                                        uPair5, sPair5, tPair5)
-                   
-                    isExecuting = false
-                }
-            })
         }
     }
 
@@ -733,24 +231,24 @@ const main = async () => {
 // processTradeEvent
 //  process a trade event on any exchange for our pairs
 //  determine if we can make a trade, and execute the trade if we can
-const processTradeEvent = async (_exchangeName, _exchangeID, _pairID,
+const processTradeEvent = async (_exchangeNames, _exchangeID, _pairID,
                                     _arbForToken,
                                     _arbForTokenContract, 
                                     _arbAgainstToken,
                                     _arbAgainstTokenContract,
-                                    _uPair, _sPair, _tPair) => {
+                                    _allPairs) => {
 
     // update stats
     totalStats.numEvents++
-    pairStats[pairID].numEvents++
-    exchangeStats[exchangeID].numEvents++
+    pairStats[_pairID].numEvents++
+    exchangeStats[_exchangeID].numEvents++
 
     // determine the exchange to buy on, and to sell on, for profit
     // Note: routerPath is a list of all routers, ordered from high to low price of the pair
-    const routerPath = await deterimineRouterPath(_exchangeName, _exchangeID, _pairID,
+    const routerPath = await deterimineRouterPath(_exchangeNames, _exchangeID, _pairID,
                                                     _arbForToken, 
                                                     _arbAgainstToken,
-                                                    _uPair, _sPair, _tPair)
+                                                    _allPairs)
 
     // if routerPath is null, the price difference was not enough, abort
     if (!routerPath) {
@@ -810,13 +308,13 @@ const processTradeEvent = async (_exchangeName, _exchangeID, _pairID,
 // Return Value:
 //   Array of routers, ordered from high to low price of the pair, OR
 //   null   (if the price difference did not meet the threshold)
-const deterimineRouterPath = async (exchangeName, exchangeID, pairID,
-                                    _arbForToken, _arbAgainstToken, uPair, sPair, tPair) => {
+const deterimineRouterPath = async (exchangeNames, exchangeID, pairID,
+                                    _arbForToken, _arbAgainstToken, allPairs) => {
     isExecuting = true
 
     if (!isInitialCheck) {
         console.log(`${moment().format("h:mm:ss a")}:  ` +
-                    `Swap Initiated on ${exchangeName} for ${_arbAgainstToken.symbol}; ` +
+                    `Swap Initiated on ${exchangeNames[exchangeID]} for ${_arbAgainstToken.symbol}; ` +
                     `looking for arbitrage...`)
     }
     const currentBlock = await web3.eth.getBlockNumber()
@@ -829,103 +327,69 @@ const deterimineRouterPath = async (exchangeName, exchangeID, pairID,
 
     // get the price of the pair on the exchange which triggered the trade.
     // also, get the price of any pair which is currently 0
-    if ( 
-            (0 === exchangeID) 
-                || 
-            ( (exchangesActive[0]) && (exchangePrices[0].prices[pairID] === 0) ) 
-        ) {
-            console.log(`getting price on Uniswap for pairID ${pairID}`)
-            exchangePrices[0].prices[pairID] = await calculatePrice(uPair, 
-                                                                decimalsFor, 
-                                                                decimalsAgainst, 
-                                                                _arbForToken, 
-                                                                _arbAgainstToken)
-    }
-    if ( 
-            (1 === exchangeID) 
-                || 
-            ( (exchangesActive[1]) && (exchangePrices[1].prices[pairID] === 0) )
-        ) {
-            console.log(`getting price on SushiSwap for pairID ${pairID}`)
-            exchangePrices[1].prices[pairID] = await calculatePrice(sPair,
-                                                                decimalsFor, 
-                                                                decimalsAgainst, 
-                                                                _arbForToken, 
-                                                                _arbAgainstToken)
-    }
-    if ( 
-            (2 === exchangeID) 
-                || 
-            ( (exchangesActive[2]) && (exchangePrices[2].prices[pairID] === 0) ) 
-        ) {
-            console.log(`getting price on ShibaSwap for pairID ${pairID}`)
-            exchangePrices[2].prices[pairID] = await calculatePrice(tPair,
-                                                                decimalsFor, 
-                                                                decimalsAgainst, 
-                                                                _arbForToken, 
-                                                                _arbAgainstToken)
-    }
-
-    let uPrice = exchangePrices[0].prices[pairID]
-    let sPrice = exchangePrices[1].prices[pairID]
-    let tPrice = exchangePrices[2].prices[pairID]
-
-    // if any exchange is not used, its price will be 0, which would always be the "low" price.
-    // we need to change its price so it will not be low or high (make it in the middle)
-
-    if (uPrice === 0) {
-        uPrice = (Number(sPrice) + Number(tPrice)) / 2
-    }
-    else if (sPrice === 0) {
-        sPrice = (Number(uPrice) + Number(tPrice)) / 2
-    }
-    else if (tPrice === 0) {
-        tPrice = (Number(uPrice) + Number(sPrice)) / 2
-    }
-
-    let maxRouter, minRouter, maxPrice, minPrice
-
-    // create the return value: 
-    //      a list of all routers, ordered from high to low price of the pair
-    let priceRouters = [
-        {
-            price: uPrice, 
-            name: uName,
-            router: uRouter,
-            pair: uPair
-        },
-        {
-            price: sPrice,
-            name: sName,
-            router: sRouter,
-            pair: sPair
-        },
-        {
-            price: tPrice,
-            name: tName,
-            router: tRouter,
-            pair: tPair
+    for (let eID = 0; eID < maxExchanges; eID++) {
+        if ( 
+                (eID === exchangeID)
+                    ||
+                ( (exchangesActive[eID]) && (exchangePrices[eID].prices[pairID] === 0) )
+            ) {
+                console.log(`getting price on ${exchangeNames[eID]} for pairID ${pairID}`)
+                exchangePrices[eID].prices[pairID] = await calculatePrice(allPairs[eID][pairID], 
+                                                                    decimalsFor, 
+                                                                    decimalsAgainst, 
+                                                                    _arbForToken, 
+                                                                    _arbAgainstToken)
         }
-    ]
+    }
+
+    var prices = []
+    var priceRouters = []
+
+    // first create a list of all exchange routers and their price for this pair
+    for (let eID = 0; eID < maxExchanges; eID++) {
+        prices[eID] = exchangePrices[eID].prices[pairID]
+        priceRouters[eID] = {
+            exchangeID: eID,
+            name: exchangeNames[eID],
+            price: prices[eID],
+            router: routers[eID],
+            pair: allPairs[eID][pairID]
+        }
+    }
 
     // sort the Routers by price, descending
     priceRouters.sort((a, b) => {
         return b.price - a.price
     })
 
-    // set the min/max exchange routers based on the prices
-    maxPrice = priceRouters[0].price 
-    maxName = priceRouters[0].name
-    minPrice = priceRouters[2].price 
-    minName = priceRouters[2].name
+    var maxPrice, minPrice, maxExchangeID, minExchangeID
 
-    // set the exchange ID for the min/max price exchange (for stats below)
-    maxExchangeID = 0   // default to Uniswap
-    if (maxName == 'SushiSwap') {maxExchangeID = 1}
-    else if (maxName == 'ShibaSwap') {maxExchangeID = 2}
-    minExchangeID = 0   // default to Uniswap
-    if (minName == 'SushiSwap') {minExchangeID = 1}
-    else if (minName == 'ShibaSwap') {minExchangeID = 2}
+    // find the min/max exchange prices (there could be prices of 0, for inactive exchanges)
+    maxPrice = priceRouters[0].price 
+    maxExchangeID = priceRouters[0].exchangeID
+    for (let eID = maxExchanges-1; eID > 0; eID--) {
+        if (priceRouters[eID].price > 0) {
+            minPrice = priceRouters[eID].price 
+            minExchangeID = priceRouters[eID].exchangeID
+            break
+        }
+    }
+
+    // for any exchange prices of 0, we need to change its price so it will not be 
+    // low or high (make it in the middle)
+    for (let eID = maxExchanges-1; eID > 0; eID--) {
+        if (priceRouters[eID].price === 0) {
+            priceRouters[eID].price = (Number(minPrice) + Number(maxPrice)) / 2
+        }
+        else {
+            break
+        }
+    }
+
+    // Now re-sort the Routers by price, descending.  Max will be first, min will be last.
+    priceRouters.sort((a, b) => {
+        return b.price - a.price
+    })
 
     const percentDifference = (((maxPrice - minPrice) / minPrice) * 100).toFixed(2)
 
@@ -935,13 +399,14 @@ const deterimineRouterPath = async (exchangeName, exchangeID, pairID,
         pairStats[pairID].highestPriceDiff = percentDifference
     }
 
-
     if (percentDifference >= difference) {
         console.log(``)
         console.log(`Price Difference Met - Current Block: ${currentBlock}`)
         console.log(`-----------------------------------------`)
-        console.log(`Buy on  ${maxName}:  ${_arbAgainstToken.symbol}/${_arbForToken.symbol}\t price = ${maxPrice}`)
-        console.log(`Sell on ${minName}:  ${_arbAgainstToken.symbol}/${_arbForToken.symbol}\t price = ${minPrice}\n`)
+        console.log(`Buy on  ${exchangeNames[maxExchangeID]}: ` +
+                    ` ${_arbAgainstToken.symbol}/${_arbForToken.symbol}\t price = ${maxPrice}`)
+        console.log(`Sell on ${exchangeNames[minExchangeID]}: ` +
+                    ` ${_arbAgainstToken.symbol}/${_arbForToken.symbol}\t price = ${minPrice}\n`)
         console.log(`Percentage Difference: ${percentDifference}%\n`)
 
         // update stats
@@ -977,6 +442,11 @@ const determineProfitability = async (_routerList,
 
     let reservesOnBuyDex, reservesOnSellDex, exchangeToBuy, exchangeToSell, actualAmountOut
 
+///////////////////////////////////////////////////////////////////////////////////////
+//
+//        SDW:  NEED TO FIX THIS NOT TO USE HARD-CODED 0 AND 2 !!!
+//
+///////////////////////////////////////////////////////////////////////////////////////
     const _routerPath = [_routerList[0].router, _routerList[2].router ]
 
     decimalsFor = _arbForToken.decimals
@@ -1066,8 +536,8 @@ const determineProfitability = async (_routerList,
         pairStats[_pairID].profitCheckCnt++
         pairStats[_pairID].totalCheckProfit = pairStats[_pairID].totalCheckProfit + 
                                                             totalGained
-        if (totalGained > pairStats[pairID].highestCheckProfit) {
-            pairStats[pairID].highestCheckProfit = Number(totalGained).toFixed(3)
+        if (totalGained > pairStats[_pairID].highestCheckProfit) {
+            pairStats[_pairID].highestCheckProfit = Number(totalGained).toFixed(3)
         }
         exchangeStats[sellExchangeID].profitCheckCnt++
         exchangeStats[buyExchangeID].profitCheckCnt++

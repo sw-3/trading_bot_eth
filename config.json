@@ -2,8 +2,11 @@
     "PROJECT_SETTINGS": {
         "isLocal": false,
         "isDeployed": false,
+        "maxPairs": 5,
+        "maxExchanges": 3,
+        "exchanges": ["UNISWAP", "SUSHISWAP", "SHIBASWAP"],
         "baseToken": "WETH",
-        "pairTokens": ["SHIB", "MANA", "USDC", "DAI", "MATIC"]
+        "pairTokens": ["SUSHI", "ELON", "COMP", "YFI", "MANA"]
     },
     "EXCHANGES": {
         "UNISWAP": {
@@ -103,6 +106,46 @@
                 "manipulateAccount": "",
                 "manipulateAmount": "",
                 "manipulateAmountOrig": ""                
+            }
+        },
+        "SUSHI": {
+            "address": "0x6B3595068778DD592e39A122f4f5a5cF09C90fE2",
+            "testData": {
+                "manipulateAccount": "",
+                "manipulateAmount": "",
+                "manipulateAmountOrig": ""
+            }
+        },
+        "ELON": {
+            "address": "0x761D38e5ddf6ccf6Cf7c55759d5210750B5D60F3",
+            "testData": {
+                "manipulateAccount": "",
+                "manipulateAmount": "",
+                "manipulateAmountOrig": ""
+            }
+        },
+        "COMP": {
+            "address": "0xc00e94Cb662C3520282E6f5717214004A7f26888",
+            "testData": {
+                "manipulateAccount": "",
+                "manipulateAmount": "",
+                "manipulateAmountOrig": ""
+            }
+        },
+        "YFI": {
+            "address": "0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e",
+            "testData": {
+                "manipulateAccount": "",
+                "manipulateAmount": "",
+                "manipulateAmountOrig": ""
+            }
+        },
+        "UFO": {
+            "address": "0x249e38Ea4102D0cf8264d3701f1a0E39C4f2DC3B",
+            "testData": {
+                "manipulateAccount": "",
+                "manipulateAmount": "",
+                "manipulateAmountOrig": ""
             }
         }
     }
