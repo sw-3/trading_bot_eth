@@ -108,7 +108,6 @@ const main = async () => {
 
     // Swap event handler function
     const swapEventHandler = async (_exchID, _pairID) => {
-    console.log(`event handler called!  eID = ${_exchID}, pID = ${_pairID}`)
         if (!isExecuting) {
             isExecuting = true
 
@@ -427,8 +426,6 @@ const deterimineRouterPath = async (exchangeNames, exchangeID, pairID,
     // handle different decimal precisions
     const decimalsFor = _arbForToken.decimals
     const decimalsAgainst = _arbAgainstToken.decimals
-    console.log(`decimals for ${_arbForToken.symbol} = ${decimalsFor}`)
-    console.log(`decimals for ${_arbAgainstToken.symbol} = ${decimalsAgainst}`)
 
     // get the price of the pair on the exchange which triggered the trade.
     // also, get the price of any pair which is currently 0
@@ -438,7 +435,6 @@ const deterimineRouterPath = async (exchangeNames, exchangeID, pairID,
                     ||
                 ( (exchangesActive[eID]) && (exchangePrices[eID].prices[pairID] === 0) )
             ) {
-                console.log(`getting price on ${exchangeNames[eID]} for pairID ${pairID}`)
                 exchangePrices[eID].prices[pairID] = await calculatePrice(allPairs[eID][pairID], 
                                                                     decimalsFor, 
                                                                     decimalsAgainst, 

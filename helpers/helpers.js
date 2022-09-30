@@ -15,6 +15,9 @@ const estimatedGasCost = process.env.GAS_PRICE
 // get the web3 connection
 const { web3 } = require('./initialization')
 
+const maxPairs = config.PROJECT_SETTINGS.maxPairs
+const maxExchanges = config.PROJECT_SETTINGS.maxExchanges
+
 const { ChainId, Token } = require("@uniswap/sdk")
 const IUniswapV2Pair = require("@uniswap/v2-core/build/IUniswapV2Pair.json")
 const IERC20 = require('@openzeppelin/contracts/build/contracts/ERC20.json')
@@ -179,15 +182,8 @@ function outputPairStats(pairStats, totalStats, pairsActive) {
     const parOpen = '('
     const percentClose = '%)'
 
-    let numPairs = 5
-
-    if (!pairsActive[1])        { numPairs = 1 }
-    else if (!pairsActive[2])   { numPairs = 2 }
-    else if (!pairsActive[3])   { numPairs = 3 }
-    else if (!pairsActive[4])   { numPairs = 4 }
-
     // update percentages & averages with current values
-    for (let pairID = 0; pairID < numPairs; pairID++) {
+    for (let pairID = 0; pairID < maxPairs; pairID++) {
         pairStats[pairID].priceDiffMetPct = pairStats[pairID].priceDiffMet / totalStats.numEvents * 100
         if (totalStats.errorCnt > 0) {
             pairStats[pairID].errorCntPct = pairStats[pairID].errorCnt / totalStats.errorCnt * 100
@@ -231,7 +227,7 @@ function outputPairStats(pairStats, totalStats, pairsActive) {
     console.log(`Token    Events   Diffs   Avg/High     Checks      Avg/High       Trades    Trades     Profit     Profit  `)
     console.log(`-----    ------   ------  --------     ------      --------       ------    ------     ------     ------  `)
     // log the stats line for each pair
-    for (let pairID = 0; pairID < numPairs; pairID++) {
+    for (let pairID = 0; pairID < maxPairs; pairID++) {
 
         console.log(`${(pairStats[pairID].symbol).padEnd(9)}` +
                 `${(pairStats[pairID].numEvents).toString().padEnd(9)}` +
