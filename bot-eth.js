@@ -199,9 +199,6 @@ const main = async () => {
         }
     }
 
-    // Exit gracefully, if any of the pairs were not found
-    if (exitValue == -3) { process.exit(-3) }
-
     /* -------------  RESEARCH MODE STUFF  ----------------------------------------
     -------------------------------------------------------------------------------*/
     if (researchRun) {
@@ -214,21 +211,24 @@ const main = async () => {
                 for (let pID = 0; pID < maxPairs; pID++) {
                     exchangeReserves[eID][pID] = [0, 0]
                     if (pairsActive[pID]) {
-                        // get current price for the pairs on each exchange
-                        exchangePrices[eID].prices[pID] = await calculatePrice(allPairs[eID][pID],
+                        // if the pair was found...
+                        if (allPairs[eID][pID] != null) {
+                            // get current price for the pairs on each exchange
+                            exchangePrices[eID].prices[pID] = await calculatePrice(allPairs[eID][pID],
                                                                     arbForToken.decimals,
                                                                     arbAgainstTokens[pID].decimals,
                                                                     arbForToken,
                                                                     arbAgainstTokens[pID])
-                        // get reserves for the pairs on each exchange
-                        exchangeReserves[eID][pID] = await getReserves(allPairs[eID][pID],
+                            // get reserves for the pairs on each exchange
+                            exchangeReserves[eID][pID] = await getReserves(allPairs[eID][pID],
                                                                         arbForToken,
                                                                         arbAgainstTokens[pID])
+                        }
                     }
                 }
             }
         }
-        // output the data
+        // output the research data
         console.log(`--------------------------------------------------------------------------------------------------------`)
         console.log(`--------------------------           Research on Token Pair Pools           ----------------------------`)
         console.log(`--------------------------------------------------------------------------------------------------------\n`)
@@ -239,15 +239,19 @@ const main = async () => {
                             `------------------------------------------------------------------------`)
                 for (let eID = 0; eID < maxExchanges; eID++) {
                     if (exchangesActive[eID]) {
-                        const fmtPrice = Number(exchangePrices[eID].prices[pID]).toFixed(4)
-                        const fmtRes1 = Number(strToDecimal(exchangeReserves[eID][pID][0],
-                                                            arbForToken.decimals)).toFixed(4)
-                        const fmtRes2 = Number(strToDecimal(exchangeReserves[eID][pID][1],
-                                                            arbAgainstTokens[pID].decimals)).toFixed(4)
-                        console.log(`   ${exchangeNames[eID].padEnd(15)}:  ` +
-                                    `price for 1 ${arbForToken.symbol} = ${fmtPrice}   ` +
-                                    `reserves = ${fmtRes1} ${arbForToken.symbol} ` +
-                                    `| ${fmtRes2} ${arbAgainstTokens[pID].symbol}]`)
+                        if (Number(exchangePrices[eID].prices[pID]) > 0) {
+                            const fmtPrice = Number(exchangePrices[eID].prices[pID]).toFixed(4)
+                            const fmtRes1 = Number(strToDecimal(exchangeReserves[eID][pID][0],
+                                                                arbForToken.decimals)).toFixed(4)
+                            const fmtRes2 = Number(strToDecimal(exchangeReserves[eID][pID][1],
+                                                                arbAgainstTokens[pID].decimals)).toFixed(4)
+                            console.log(`   ${exchangeNames[eID].padEnd(15)}:  ` +
+                                        `price for 1 ${arbForToken.symbol} = ${fmtPrice}   ` +
+                                        `reserves = ${fmtRes1} ${arbForToken.symbol} ` +
+                                        `| ${fmtRes2} ${arbAgainstTokens[pID].symbol}]`)
+                        } else {
+                            console.log(`   ${exchangeNames[eID].padEnd(15)}:  `)
+                        }
                     }
                 }
                 console.log(``)
@@ -258,6 +262,9 @@ const main = async () => {
         // done with research mode, exit
         process.exit()
     }
+
+    // Exit gracefully, if any of the configured pairs were not found
+    if (exitValue == -3) { process.exit(-3) }
 
     // Execute a 1-time sweep of the pair prices after start-up
     var receipt

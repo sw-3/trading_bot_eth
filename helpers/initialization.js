@@ -109,8 +109,9 @@ var totalStats =
         profits: 0 
     }
 
-var pairStats = [
-    { 
+var pairStats = []
+for (let pID = 0; pID < maxPairs; pID++) {
+    pairStats[pID] = {
         symbol: '',
         numEvents: 0,
         priceDiffMet: 0,
@@ -131,96 +132,8 @@ var pairStats = [
         tradeSuccPct: 0,
         tradeProfits: 0,
         avgTradeProfit: 0
-    },
-    {
-        symbol: '',
-        numEvents: 0,
-        priceDiffMet: 0,
-        priceDiffMetPct: 0,
-        totalPriceDiffAmt: 0,
-        avgPriceDiff: 0,
-        highestPriceDiff: 0,
-        errorCnt: 0,
-        errorCntPct: 0,
-        profitCheckCnt: 0,
-        profitCheckCntPct: 0,
-        totalCheckProfit: 0,
-        avgCheckProfit: 0, 
-        highestCheckProfit: -999,
-        tradeCnt: 0,
-        tradeCntPct: 0,
-        tradeSucc: 0,
-        tradeSuccPct: 0,
-        tradeProfits: 0,
-        avgTradeProfit: 0
-    },
-    {
-        symbol: '',
-        numEvents: 0,
-        priceDiffMet: 0,
-        priceDiffMetPct: 0,
-        totalPriceDiffAmt: 0,
-        avgPriceDiff: 0,
-        highestPriceDiff: 0,
-        errorCnt: 0,
-        errorCntPct: 0,
-        profitCheckCnt: 0,
-        profitCheckCntPct: 0,
-        totalCheckProfit: 0,
-        avgCheckProfit: 0, 
-        highestCheckProfit: -999,
-        tradeCnt: 0,
-        tradeCntPct: 0,
-        tradeSucc: 0,
-        tradeSuccPct: 0,
-        tradeProfits: 0,
-        avgTradeProfit: 0
-    },
-    {
-        symbol: '',
-        numEvents: 0,
-        priceDiffMet: 0,
-        priceDiffMetPct: 0,
-        totalPriceDiffAmt: 0,
-        avgPriceDiff: 0,
-        highestPriceDiff: 0,
-        errorCnt: 0,
-        errorCntPct: 0,
-        profitCheckCnt: 0,
-        profitCheckCntPct: 0,
-        totalCheckProfit: 0,
-        avgCheckProfit: 0, 
-        highestCheckProfit: -999,
-        tradeCnt: 0,
-        tradeCntPct: 0,
-        tradeSucc: 0,
-        tradeSuccPct: 0,
-        tradeProfits: 0,
-        avgTradeProfit: 0
-    },
-    {
-        symbol: '',
-        numEvents: 0,
-        priceDiffMet: 0,
-        priceDiffMetPct: 0,
-        totalPriceDiffAmt: 0,
-        avgPriceDiff: 0,
-        highestPriceDiff: 0,
-        errorCnt: 0,
-        errorCntPct: 0,
-        profitCheckCnt: 0,
-        profitCheckCntPct: 0,
-        totalCheckProfit: 0,
-        avgCheckProfit: 0, 
-        highestCheckProfit: -999,
-        tradeCnt: 0,
-        tradeCntPct: 0,
-        tradeSucc: 0,
-        tradeSuccPct: 0,
-        tradeProfits: 0,
-        avgTradeProfit: 0
     }
-]
+}
 
 var exchangeStats = [
     { 
