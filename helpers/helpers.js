@@ -86,11 +86,13 @@ async function calculatePrice(_pairContract, _decimals0, _decimals1, _token0, _t
 }
 
 async function getEstimatedReturn(amount, _routerPath, _token0, _token1) {
-    const trade1 = await _routerPath[0].methods.getAmountsOut(amount, [_token0.address, _token1.address]).call()
-    const trade2 = await _routerPath[1].methods.getAmountsOut(trade1[1], [_token1.address, _token0.address]).call()
+    const trade1 = await _routerPath[0].router.methods.getAmountsOut(amount, [_token0.address, _token1.address]).call()
+    const trade2 = await _routerPath[1].router.methods.getAmountsOut(trade1[1], [_token1.address, _token0.address]).call()
 
-    const amountIn = Number(web3.utils.fromWei(trade1[0], 'ether'))
-    const amountOut = Number(web3.utils.fromWei(trade2[1], 'ether'))
+//    const amountIn = Number(web3.utils.fromWei(trade1[0], 'ether'))
+//    const amountOut = Number(web3.utils.fromWei(trade2[1], 'ether'))
+    const amountIn = Number(strToDecimal(trade1[0], _token0.decimals))
+    const amountOut = Number(strToDecimal(trade2[1], _token0.decimals))
 
     return { amountIn, amountOut }
 }

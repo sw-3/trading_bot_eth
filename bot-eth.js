@@ -348,7 +348,7 @@ const processTradeEvent = async (_exchangeNames, _exchangeID, _pairID,
     exchangeStats[_exchangeID].numEvents++
 
     // determine the exchange to buy on, and to sell on, for profit
-    // Note: routerPath is a list of all routers, ordered from high to low price of the pair
+    // Note: routerPath is a list of 2 routers for the arbitrage; buy on 1st, sell on 2nd
     const routerPath = await deterimineRouterPath(_exchangeNames, _exchangeID, _pairID,
                                                     _arbForToken, 
                                                     _arbAgainstToken,
@@ -410,7 +410,7 @@ const processTradeEvent = async (_exchangeNames, _exchangeID, _pairID,
 // determineRouterPath
 // determine the exchange to buy on, and to sell on, for profit
 // Return Value:
-//   Array of routers, ordered from high to low price of the pair, OR
+//   Array of 2 routers, ordered from high (buy) to low (sell) price of the pair, OR
 //   null   (if the price difference did not meet the threshold)
 const deterimineRouterPath = async (exchangeNames, exchangeID, pairID,
                                     _arbForToken, _arbAgainstToken, allPairs) => {
@@ -446,51 +446,42 @@ const deterimineRouterPath = async (exchangeNames, exchangeID, pairID,
     var prices = []
     var priceRouters = []
 
-    // first create a list of all exchange routers and their price for this pair
+    // first create a list of all 'monitored' exchange prices for this pair
+    let n = 0
     for (let eID = 0; eID < maxExchanges; eID++) {
-        prices[eID] = exchangePrices[eID].prices[pairID]
-        priceRouters[eID] = {
-            exchangeID: eID,
-            name: exchangeNames[eID],
-            price: prices[eID],
-            router: routers[eID],
-            pair: allPairs[eID][pairID]
+        if (exchangesActive[eID]) {
+            prices[n] = {
+                exchangeID: eID,
+                price: exchangePrices[eID].prices[pairID]
+            }
+            n++
         }
     }
-
-    // sort the Routers by price, descending
-    priceRouters.sort((a, b) => {
+    // sort the list of exchange prices by price, descending
+    prices.sort((a, b) => {
         return b.price - a.price
     })
 
+    // create the priceRouters array with high priced Dex as item 0, and low as item 1
     var maxPrice, minPrice, maxExchangeID, minExchangeID
-
-    // find the min/max exchange prices (there could be prices of 0, for inactive exchanges)
-    maxPrice = priceRouters[0].price 
-    maxExchangeID = priceRouters[0].exchangeID
-    for (let eID = maxExchanges-1; eID > 0; eID--) {
-        if (priceRouters[eID].price > 0) {
-            minPrice = priceRouters[eID].price 
-            minExchangeID = priceRouters[eID].exchangeID
-            break
-        }
+    maxPrice = prices[0].price
+    maxExchangeID = prices[0].exchangeID
+    priceRouters[0] = {
+        exchangeID: maxExchangeID,
+        name: exchangeNames[maxExchangeID],
+        price: maxPrice,
+        router: routers[maxExchangeID],
+        pair: allPairs[maxExchangeID][pairID]
     }
-
-    // for any exchange prices of 0, we need to change its price so it will not be 
-    // low or high (make it in the middle)
-    for (let eID = maxExchanges-1; eID > 0; eID--) {
-        if (priceRouters[eID].price === 0) {
-            priceRouters[eID].price = (Number(minPrice) + Number(maxPrice)) / 2
-        }
-        else {
-            break
-        }
+    minPrice = prices[n-1].price
+    minExchangeID = prices[n-1].exchangeID
+    priceRouters[1] = {
+        exchangeID: minExchangeID,
+        name: exchangeNames[minExchangeID],
+        price: minPrice,
+        router: routers[minExchangeID],
+        pair: allPairs[minExchangeID][pairID]
     }
-
-    // Now re-sort the Routers by price, descending.  Max will be first, min will be last.
-    priceRouters.sort((a, b) => {
-        return b.price - a.price
-    })
 
     const percentDifference = (((maxPrice - minPrice) / minPrice) * 100).toFixed(2)
 
@@ -530,7 +521,7 @@ const deterimineRouterPath = async (exchangeNames, exchangeID, pairID,
 // amounts and the cost of gas.
 // Return Value:
 //    The amount of the flashloan needed, OR 0 if not profitable
-const determineProfitability = async (_routerList, 
+const determineProfitability = async (_routerPath, 
                                         _arbForTokenContract, 
                                         _arbForToken, 
                                         _arbAgainstToken,
@@ -543,20 +534,13 @@ const determineProfitability = async (_routerList,
 
     let reservesOnBuyDex, reservesOnSellDex, exchangeToBuy, exchangeToSell, actualAmountOut
 
-///////////////////////////////////////////////////////////////////////////////////////
-//
-//        SDW:  NEED TO FIX THIS NOT TO USE HARD-CODED 0 AND 2 !!!
-//
-///////////////////////////////////////////////////////////////////////////////////////
-    const _routerPath = [_routerList[0].router, _routerList[2].router ]
-
     decimalsFor = _arbForToken.decimals
     decimalsAgainst = _arbAgainstToken.decimals
-    reservesOnBuyDex = await getReserves(_routerList[0].pair, _arbForToken, _arbAgainstToken)
-    reservesOnSellDex = await getReserves(_routerList[2].pair, _arbForToken, _arbAgainstToken)
+    reservesOnBuyDex = await getReserves(_routerPath[0].pair, _arbForToken, _arbAgainstToken)
+    reservesOnSellDex = await getReserves(_routerPath[1].pair, _arbForToken, _arbAgainstToken)
 
-    exchangeToBuy = _routerList[0].name
-    exchangeToSell = _routerList[2].name
+    exchangeToBuy = _routerPath[0].name
+    exchangeToSell = _routerPath[1].name
     
     // set the exchange ID for the exchanges (for stats)
     let buyExchangeID = 0   // default to Uniswap
@@ -588,14 +572,14 @@ const determineProfitability = async (_routerList,
     try {
 
         // This returns the amount of ArbFor needed from the flash loan, to buy enough ArbAgainst in the 1st trade 
-        let result = await _routerPath[0].methods.getAmountsIn(actualAmountOut, [_arbForToken.address, _arbAgainstToken.address]).call()
+        let result = await _routerPath[0].router.methods.getAmountsIn(actualAmountOut, [_arbForToken.address, _arbAgainstToken.address]).call()
 
         const token0In = result[0] // ARB_FOR
         const token1In = result[1] // ARB_AGAINST
         
         console.log(`Estimated amount of ${_arbForToken.symbol} to buy ${strToDecimal(actualAmountOut, decimalsAgainst)} ${_arbAgainstToken.symbol} on ${exchangeToBuy}\t\t| ${strToDecimal(token0In, decimalsFor)}`)
 
-        result = await _routerPath[1].methods.getAmountsOut(token1In, [_arbAgainstToken.address, _arbForToken.address]).call()
+        result = await _routerPath[1].router.methods.getAmountsOut(token1In, [_arbAgainstToken.address, _arbForToken.address]).call()
 
         console.log(`Estimated amount of ${_arbForToken.symbol} returned after swapping ${_arbAgainstToken.symbol} on ${exchangeToSell}\t| ${strToDecimal(result[1], decimalsFor)}\n`)
 
@@ -672,7 +656,7 @@ const determineProfitability = async (_routerList,
 // executeTrade
 // Routine to call the arbitrage smart contract to execute the trades.
 // Return Value:  None.   (Should return some kind of receipt??)
-const executeTrade = async (_routerList, 
+const executeTrade = async (_routerPath, 
                             _arbForTokenContract, 
                             _arbAgainstTokenContract, 
                             _arbForToken, 
@@ -684,16 +668,16 @@ const executeTrade = async (_routerList,
 
     // get the indicators of the exchanges to use for the arbitrage
     firstExchange = 2
-    if (_routerList[0].name == 'Uniswap' ) {
+    if (_routerPath[0].name == 'Uniswap' ) {
         firstExchange = 0
-    } else if (_routerList[0].name == 'SushiSwap') {
+    } else if (_routerPath[0].name == 'SushiSwap') {
         firstExchange = 1
     }
 
     secondExchange = 2
-    if (_routerList[2].name == 'Uniswap' ) {
+    if (_routerPath[1].name == 'Uniswap' ) {
         secondExchange = 0
-    } else if (_routerList[2].name == 'SushiSwap') {
+    } else if (_routerPath[1].name == 'SushiSwap') {
         secondExchange = 1
     }
 
