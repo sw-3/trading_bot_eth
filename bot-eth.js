@@ -129,10 +129,11 @@ const main = async () => {
     // sanity checks
     let numExchanges = 0
     let numPairs = 0
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < maxExchanges; i++) {
         if (exchangesActive[i]) {numExchanges++}
+        else {break}
     }
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < maxPairs; i++) {
         if (pairsActive[i]) {numPairs++}
         else {break}
     }
@@ -165,7 +166,6 @@ const main = async () => {
     if (researchRun) {
         console.log(`Looking for configured exchanges and pairs...\n`)
     }
-    var exitValue = 0
     var exchPair
     for (let eID = 0; eID < maxExchanges; eID++) {
         // for each exchange ...
@@ -180,10 +180,9 @@ const main = async () => {
                                                             arbForToken.address, 
                                                             arbAgainstTokens[pID].address)
                     if (exchPair === null) {
-                        console.log(`ERROR: did not find` +
+                        console.log(`WARNING: did not find` +
                                     ` ${arbForToken.symbol}/${arbAgainstTokens[pID].symbol}` +
                                     ` on ${exchangeNames[eID]}.`)
-                        exitValue = -3
                     }
                 } else {
                     // if the exch is active, but not the pair, set this contract to null
@@ -195,6 +194,24 @@ const main = async () => {
                 exchPair = null
             }
             allPairs[eID][pID] = exchPair
+        }
+    }
+
+    // determine if any active pair does not have at least 2 exchanges to monitor
+    for (let pID = 0; pID < maxPairs; pID++) {
+        if (pairsActive[pID]) {
+            // this pair is active, need at least 2 exchange contracts...
+            let numContracts = 0
+            for (let eID = 0; eID < maxExchanges; eID++) {
+                if (allPairs[eID][pID] !== null) {
+                    numContracts++
+                }
+            }
+            if (numContracts < 2) {
+                console.log(`WARNING!  ${arbForToken.symbol}/${arbAgainstTokens[pID].symbol}` +
+                            ` is not supported on 2 monitored exchanges; removing this pair.\n`)
+                pairsActive[pID] = false
+            }
         }
     }
 
@@ -211,7 +228,7 @@ const main = async () => {
                     exchangeReserves[eID][pID] = [0, 0]
                     if (pairsActive[pID]) {
                         // if the pair was found...
-                        if (allPairs[eID][pID] != null) {
+                        if (allPairs[eID][pID] !== null) {
                             // get current price for the pairs on each exchange
                             exchangePrices[eID].prices[pID] = await calculatePrice(allPairs[eID][pID],
                                                                     arbForToken.decimals,
@@ -263,7 +280,7 @@ const main = async () => {
     }
 
     // Exit gracefully, if any of the configured pairs were not found
-    if (exitValue == -3) { process.exit(-3) }
+    //if (exitValue == -3) { process.exit(-3) }
 
     // Execute a 1-time sweep of the pair prices after start-up
     var receipt
@@ -301,7 +318,7 @@ const main = async () => {
         if (pairsActive[pID]) {
             console.log(`--------   ${arbForToken.symbol}/${arbAgainstTokens[pID].symbol}    ------------------------------------------`)
             for (let eID = 0; eID < maxExchanges; eID++) {
-                if (exchangesActive[eID]) {
+                if (exchangesActive[eID] && (allPairs[eID][pID] !== null)) {
                     console.log(`   ${exchangeNames[eID]} contract:    ${allPairs[eID][pID].options.address}`)
                 }
             }
@@ -316,8 +333,8 @@ const main = async () => {
         if (exchangesActive[eID]) {
             // exchange is active; set up event handler for active pairs
             for (let pID = 0; pID < maxPairs; pID++) {
-                if (pairsActive[pID]) {
-                    // pair is active
+                if (pairsActive[pID] && (allPairs[eID][pID] !== null)) {
+                    // pair is active and supported on the dex; assign event handler
                     allPairs[eID][pID].events.Swap({}, async () => { swapEventHandler(eID, pID) })
                 }
             }
@@ -435,11 +452,13 @@ const deterimineRouterPath = async (exchangeNames, exchangeID, pairID,
                     ||
                 ( (exchangesActive[eID]) && (exchangePrices[eID].prices[pairID] === 0) )
             ) {
-                exchangePrices[eID].prices[pairID] = await calculatePrice(allPairs[eID][pairID], 
+                if (allPairs[eID][pairID] !== null) {
+                    exchangePrices[eID].prices[pairID] = await calculatePrice(allPairs[eID][pairID], 
                                                                     decimalsFor, 
                                                                     decimalsAgainst, 
                                                                     _arbForToken, 
                                                                     _arbAgainstToken)
+                }
         }
     }
 
@@ -449,7 +468,7 @@ const deterimineRouterPath = async (exchangeNames, exchangeID, pairID,
     // first create a list of all 'monitored' exchange prices for this pair
     let n = 0
     for (let eID = 0; eID < maxExchanges; eID++) {
-        if (exchangesActive[eID]) {
+        if ( (exchangesActive[eID]) && (allPairs[eID][pairID] !== null) ) {
             prices[n] = {
                 exchangeID: eID,
                 price: exchangePrices[eID].prices[pairID]
@@ -665,20 +684,35 @@ const executeTrade = async (_routerPath,
     console.log(`Attempting Arbitrage...\n`)
 
     let firstExchange, secondExchange
+    let isDeployed = config.PROJECT_SETTINGS.isDeployed
 
     // get the indicators of the exchanges to use for the arbitrage
-    firstExchange = 2
+    firstExchange = 999
     if (_routerPath[0].name == 'Uniswap' ) {
         firstExchange = 0
     } else if (_routerPath[0].name == 'SushiSwap') {
         firstExchange = 1
+    } else if (_routerPath[0].name == 'ShibaSwap') {
+        firstExchange = 2
+    } else {
+        // did not recognize this exchange??? force trade to not execute
+        console.log(`\nWARNING:  Exchange name '${_routerPath[0].name}' not supported by the smart contract.`)
+        console.log(`Forcing 'not deployed' mode for this trade...`)
+        isDeployed = 'false'
     }
 
-    secondExchange = 2
+    secondExchange = 999
     if (_routerPath[1].name == 'Uniswap' ) {
         secondExchange = 0
     } else if (_routerPath[1].name == 'SushiSwap') {
         secondExchange = 1
+    } else if (_routerPath[1].name == 'ShibaSwap') {
+        secondExchange = 2
+    } else {
+        // did not recognize this exchange??? force trade to not execute
+        console.log(`\nWARNING:  Exchange name '${_routerPath[1].name}' not supported by the smart contract.`)
+        console.log(`Forcing 'not deployed' mode for this trade...`)
+        isDeployed = 'false'
     }
 
     const decimalsFor = _arbForToken.decimals
@@ -693,7 +727,7 @@ const executeTrade = async (_routerPath,
     exchangeStats[firstExchange].tradeCnt++
     exchangeStats[secondExchange].tradeCnt++
 
-    if (config.PROJECT_SETTINGS.isDeployed) {
+    if (isDeployed) {
         await arbitrage.methods.executeTrade(firstExchange, secondExchange, _arbForTokenContract._address, _arbAgainstTokenContract._address, _flashLoanAmount).send({ from: account, gas: gas })
     } else {
         console.log(`\nNot deployed; trade not executed.\n\n`)
